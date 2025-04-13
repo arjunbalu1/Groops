@@ -25,4 +25,9 @@ go.work
 
 # OS specific files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+!.env.example 

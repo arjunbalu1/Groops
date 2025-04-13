@@ -13,7 +13,9 @@ import (
 // This is our main function - the entry point of our application
 func main() {
 	// Initialize database
-	database.InitDB()
+	if err := database.InitDB(); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
 
 	// Initialize Gin router
 	router := gin.Default()
@@ -24,6 +26,7 @@ func main() {
 	// Basic routes
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
+	router.GET("/test-db", handlers.TestDatabaseHandler)
 
 	// Account routes
 	router.POST("/accounts", handlers.CreateAccount)
