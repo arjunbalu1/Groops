@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"groops/internal/database"
 	"groops/internal/handlers"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,9 @@ import (
 
 // This is our main function - the entry point of our application
 func main() {
+	// Initialize database
+	database.InitDB()
+
 	// Initialize Gin router
 	router := gin.Default()
 
