@@ -1,9 +1,6 @@
 package models
 
 import (
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,32 +13,6 @@ type ActivityLog struct {
 	EventType string    `gorm:"size:20;not null" json:"event_type"` // create_group, join_group, leave_group
 	GroupID   string    `gorm:"size:50;not null" json:"group_id"`
 	Timestamp time.Time `gorm:"not null;index" json:"timestamp"`
-}
-
-// ActivityLogList represents a list of activity logs
-type ActivityLogList []ActivityLog
-
-func (a *ActivityLogList) Value() (driver.Value, error) {
-	if a == nil {
-		return "[]", nil
-	}
-	return json.Marshal(a)
-}
-
-func (a *ActivityLogList) Scan(value interface{}) error {
-	if value == nil {
-		*a = make([]ActivityLog, 0)
-		return nil
-	}
-
-	switch v := value.(type) {
-	case []byte:
-		return json.Unmarshal(v, a)
-	case string:
-		return json.Unmarshal([]byte(v), a)
-	default:
-		return fmt.Errorf("unsupported type for ActivityLogList: %T", value)
-	}
 }
 
 // Account represents a user account in the system
@@ -58,32 +29,6 @@ type Account struct {
 	CreatedAt    time.Time      `gorm:"not null" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"not null" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
-}
-
-// StringList represents a list of strings that can be stored as JSONB
-type StringList []string
-
-func (s *StringList) Value() (driver.Value, error) {
-	if s == nil {
-		return "[]", nil
-	}
-	return json.Marshal(s)
-}
-
-func (s *StringList) Scan(value interface{}) error {
-	if value == nil {
-		*s = make([]string, 0)
-		return nil
-	}
-
-	switch v := value.(type) {
-	case []byte:
-		return json.Unmarshal(v, s)
-	case string:
-		return json.Unmarshal([]byte(v), s)
-	default:
-		return fmt.Errorf("unsupported type for StringList: %T", value)
-	}
 }
 
 // BeforeCreate hook is called before creating a new account
@@ -131,7 +76,7 @@ type CreateAccountRequest struct {
 }
 
 // LoginRequest represents the data needed for login
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
+// type LoginRequest struct {
+// 	Username string `json:"username" binding:"required"`
+// 	Password string `json:"password" binding:"required"`
+// }
