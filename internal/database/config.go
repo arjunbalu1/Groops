@@ -100,6 +100,7 @@ func GetDB() *gorm.DB {
 }
 
 // WithTx executes function within a transaction
-func WithTx(fn func(tx *gorm.DB) error) error {
-	return DB.Transaction(fn)
-}
+//not being used currently
+// func WithTx(fn func(tx *gorm.DB) error) error {
+// 	return DB.Transaction(fn)
+// }

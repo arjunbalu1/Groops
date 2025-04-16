@@ -18,10 +18,10 @@ func CreateGroup(c *gin.Context) {
 		Name              string       `json:"name" binding:"required"`
 		DateTime          time.Time    `json:"date_time" binding:"required"`
 		Venue             models.Venue `json:"venue" binding:"required"`
-		Cost              float64      `json:"cost" binding:"required"`
-		SkillLevel        string       `json:"skill_level" binding:"required"`
-		ActivityType      string       `json:"activity_type" binding:"required"`
-		MaxMembers        int          `json:"max_members" binding:"required"`
+		Cost              float64      `json:"cost" binding:"required,min=0"`
+		SkillLevel        string       `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
+		ActivityType      string       `json:"activity_type" binding:"required,oneof=sport social games other"`
+		MaxMembers        int          `json:"max_members" binding:"required,min=2"`
 		Description       string       `json:"description" binding:"required"`
 		OrganizerUsername string       `json:"organizer_username" binding:"required"`
 	}
