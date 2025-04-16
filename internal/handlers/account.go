@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"time"
 
+	"groops/internal/database"
 	"groops/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // CreateAccount handles new user registration
@@ -17,57 +19,55 @@ func CreateAccount(c *gin.Context) {
 		return
 	}
 
-	// TODO: Check if username already exists
-	// TODO: Hash password
-
+	// TODO: Hash password properly in production
+	now := time.Now()
 	account := models.Account{
-		Username:        req.Username,
-		Email:           req.Email,
-		HashedPass:      "hashed_password_here", // TODO: Implement proper hashing
-		DateJoined:      time.Now(),
-		Rating:          5.0, // Default rating
-		ActivityHistory: []models.ActivityLog{},
-		OwnedGroops:     []string{},
-		ApprovedGroops:  []string{},
-		PendingGroops:   []string{},
+		Username:   req.Username,
+		Email:      req.Email,
+		HashedPass: req.Password, // TODO: Implement proper hashing
+		DateJoined: now,
+		Rating:     5.0,
+		LastLogin:  now,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
-	// TODO: Save to database
+	db := database.GetDB()
+	if err := db.Create(&account).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusCreated, account)
 }
 
 // LogActivity adds a new activity to user's history
-func LogActivity(username string, eventType string, groopID string) {
-	// TODO: Implement database operation
+func LogActivity(username string, eventType string, groupID string) error {
 	activity := models.ActivityLog{
+		Username:  username,
 		EventType: eventType,
-		GroopID:   groopID,
+		GroupID:   groupID,
 		Timestamp: time.Now(),
 	}
-	_ = activity // Remove when implementing database operations
+
+	db := database.GetDB()
+	return db.Create(&activity).Error
 }
 
 // GetAccount retrieves account information
 func GetAccount(c *gin.Context) {
 	username := c.Param("username")
 
-	// TODO: Fetch from database
-	account := models.Account{
-		Username:   username,
-		Email:      username + "@example.com",
-		DateJoined: time.Now().Add(-24 * time.Hour), // Example: joined yesterday
-		Rating:     4.5,
-		ActivityHistory: []models.ActivityLog{
-			{
-				EventType: "create_group",
-				GroopID:   "sample-group-1",
-				Timestamp: time.Now().Add(-1 * time.Hour),
-			},
-		},
-		OwnedGroops:    []string{"sample-group-1"},
-		ApprovedGroops: []string{"sample-group-2"},
-		PendingGroops:  []string{"sample-group-3"},
+	db := database.GetDB()
+	var account models.Account
+	if err := db.Preload("Activities").Preload("OwnedGroups").Preload("JoinedGroups").
+		Where("username = ?", username).First(&account).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, account)

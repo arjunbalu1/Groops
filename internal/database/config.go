@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"groops/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
 
 var DB *gorm.DB
@@ -23,22 +26,54 @@ func InitDB() {
 	port := getEnvOrDefault("DB_PORT", "5432")
 
 	// Connection string
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
 		host, user, password, dbname, port)
 
-	// Open connection
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+	// Configure GORM
+	gormConfig := &gorm.Config{
+		Logger: logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             time.Second, // Log queries slower than 1 second
+				LogLevel:                  logger.Info, // Log all SQL queries
+				IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
+				Colorful:                  true,        // Enable color
+			},
+		),
+		NamingStrategy: schema.NamingStrategy{
+			SingularTable: true, // Use singular table names
+		},
+		PrepareStmt:                              true,  // Enable prepared statement cache
+		SkipDefaultTransaction:                   false, // Keep default transaction for safety
+		DisableForeignKeyConstraintWhenMigrating: false, // Enable foreign key constraints
 	}
+
+	// Open connection
+	var err error
+	DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Configure connection pool
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get database instance: %w", err)
+	}
+
+	// Set connection pool settings
+	sqlDB.SetMaxIdleConns(10)           // Maximum number of idle connections
+	sqlDB.SetMaxOpenConns(100)          // Maximum number of open connections
+	sqlDB.SetConnMaxLifetime(time.Hour) // Maximum lifetime of a connection
 
 	// Auto Migrate the schema
 	err = db.AutoMigrate(
 		&models.Account{},
 		&models.Group{},
-	)
-	if err != nil {
-		log.Fatal("Failed to migrate database:", err)
+		&models.GroupMember{},
+		&models.ActivityLog{},
+	); err != nil {
+		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
 	DB = db
@@ -51,4 +86,14 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// GetDB returns the database instance
+func GetDB() *gorm.DB {
+	return DB
+}
+
+// WithTx executes function within a transaction
+func WithTx(fn func(tx *gorm.DB) error) error {
+	return DB.Transaction(fn)
 }
