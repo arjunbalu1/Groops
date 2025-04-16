@@ -96,34 +96,12 @@ func CreateGroup(c *gin.Context) {
 
 // GetGroups handles listing all groups
 func GetGroups(c *gin.Context) {
-	// TODO: Fetch from database
-	groups := []models.Group{
-		{
-			ID:       "arjun-20240313150000",
-			Name:     "Basketball Game",
-			DateTime: time.Now().Add(24 * time.Hour),
-			Venue: models.Venue{
-				FormattedAddress: "123 Sports Center, Downtown, City",
-				PlaceID:          "ChIJxxx...",
-				Latitude:         40.7128,
-				Longitude:        -74.0060,
-			},
-			Cost:         15.0,
-			SkillLevel:   models.Intermediate,
-			ActivityType: models.SportActivity,
-			MaxMembers:   12,
-			Description:  "Weekly basketball game - all welcome!",
-			OrganiserID:  "arjun",
-			Members: []models.GroupMember{
-				{
-					GroupID:   "arjun-20240313150000",
-					Username:  "arjun",
-					Status:    "approved",
-					JoinedAt:  time.Now(),
-					UpdatedAt: time.Now(),
-				},
-			},
-		},
+	db := database.GetDB()
+	var groups []models.Group
+
+	if err := db.Preload("Members").Find(&groups).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups"})
+		return
 	}
 
 	c.JSON(http.StatusOK, groups)

@@ -26,7 +26,6 @@ func main() {
 	// Basic routes
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
-	router.GET("/test-db", handlers.TestDatabaseHandler)
 
 	// Account routes
 	router.POST("/accounts", handlers.CreateAccount)
