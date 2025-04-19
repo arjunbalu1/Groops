@@ -146,7 +146,7 @@ Tracks user activity:
 - For production deployment, enable the Secure flag for cookies and use HTTPS.
 - Redis caching is configured but not currently used.
 
--Group Management needs:
+- Group Management needs:
 Join group API endpoint
 Organizer approval functionality
 Leave group capability
