@@ -146,3 +146,26 @@ Tracks user activity:
 - For production deployment, enable the Secure flag for cookies and use HTTPS.
 - Redis caching is configured but not currently used.
 
+-Group Management needs:
+Join group API endpoint
+Organizer approval functionality
+Leave group capability
+Search/Filtering requires:
+Filter endpoints (activity, date, location)
+Sorting implementation
+User Features missing:
+Profile management
+Rating system
+Password reset
+UI Integration pending:
+Google Maps
+Verification systems
+Chat functionality
+
+- It's better to implement filtering and sorting on the backend now for several reasons:
+Performance: Database-level filtering is much more efficient than sending all data to the frontend
+Scalability: As your dataset grows, client-side filtering will become increasingly problematic
+Bandwidth: Reduces data transfer between server and client
+Pagination: Proper pagination requires backend filtering to work correctly
+Code organization: Keeping this logic in the backend maintains cleaner separation of concerns
+For location-based filtering especially, implementing at the database level with spatial queries will provide significantly better performance than any client-side solution. Even with a small dataset initially, building the foundation properly now will prevent refactoring later.
