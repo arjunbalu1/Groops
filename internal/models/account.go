@@ -26,6 +26,7 @@ type Account struct {
 	OwnedGroups  []Group        `gorm:"foreignKey:OrganiserID" json:"owned_groups"`
 	JoinedGroups []GroupMember  `gorm:"foreignKey:Username" json:"joined_groups"`
 	LastLogin    time.Time      `gorm:"not null" json:"last_login"`
+	TokenVersion int            `gorm:"not null;default:0" json:"-"` // Used for token invalidation
 	CreatedAt    time.Time      `gorm:"not null" json:"created_at"`
 	UpdatedAt    time.Time      `gorm:"not null" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`

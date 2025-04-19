@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"groops/internal/auth"
 	"groops/internal/database"
 	"groops/internal/handlers"
 
@@ -27,13 +28,28 @@ func main() {
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
 
-	// Account routes
+	// Auth routes (no auth required)
+	router.POST("/auth/login", handlers.Login)
+
+	// Account routes (no auth required)
 	router.POST("/accounts", handlers.CreateAccount)
 	router.GET("/accounts/:username", handlers.GetAccount)
 
-	// Group routes
-	router.POST("/groups", handlers.CreateGroup)
-	router.GET("/groups", handlers.GetGroups)
+	// Public group routes
+	router.GET("/public/groups", handlers.GetGroups)
+
+	// Protected routes (auth required)
+	protected := router.Group("")
+	protected.Use(auth.AuthMiddleware())
+	{
+		// Auth routes that require authentication
+		protected.POST("/auth/logout", handlers.Logout) // Logout requires auth to invalidate token
+		protected.GET("/auth/me", handlers.GetCurrentUser)
+
+		// Protected group routes
+		protected.POST("/groups", handlers.CreateGroup)
+		protected.GET("/groups", handlers.GetGroups)
+	}
 
 	// Start the server
 	fmt.Println("Server starting on port 8080...")
