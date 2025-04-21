@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -49,7 +50,31 @@ func (a *Account) BeforeCreate(tx *gorm.DB) error {
 	if a.Rating == 0 {
 		a.Rating = 5.0
 	}
+
+	// Hash password if it's not already hashed
+	if !isPasswordHashed(a.HashedPass) {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(a.HashedPass), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		a.HashedPass = string(hashedPassword)
+	}
+
 	return nil
+}
+
+// Helper to check if password is already hashed
+func isPasswordHashed(password string) bool {
+	// Bcrypt hashes start with $2a$, $2b$ or $2y$
+	return len(password) > 4 && (password[:4] == "$2a$" ||
+		password[:4] == "$2b$" ||
+		password[:4] == "$2y$")
+}
+
+// VerifyPassword checks if the provided password matches the stored hash
+func (a *Account) VerifyPassword(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(a.HashedPass), []byte(password))
+	return err == nil
 }
 
 // BeforeSave hook is called before saving the account
@@ -76,7 +101,7 @@ type CreateAccountRequest struct {
 }
 
 // LoginRequest represents the data needed for login
-// type LoginRequest struct {
-// 	Username string `json:"username" binding:"required"`
-// 	Password string `json:"password" binding:"required"`
-// }
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
