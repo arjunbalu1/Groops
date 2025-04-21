@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"groops/internal/auth"
 	"groops/internal/database"
 	"groops/internal/handlers"
 
@@ -21,17 +22,26 @@ func main() {
 	// Configure trusted proxies
 	router.SetTrustedProxies([]string{"127.0.0.1"})
 
-	// Basic routes
+	// Public routes
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
 
-	// Account routes
+	// Authentication routes
 	router.POST("/accounts", handlers.CreateAccount)
-	router.GET("/accounts/:username", handlers.GetAccount)
+	router.POST("/auth/login", handlers.LoginHandler)
+	router.POST("/auth/refresh", handlers.RefreshTokenHandler)
 
-	// Group routes
-	router.POST("/groups", handlers.CreateGroup)
-	router.GET("/groups", handlers.GetGroups)
+	// Protected API routes
+	api := router.Group("/api")
+	api.Use(auth.AuthMiddleware())
+	{
+		// Account routes
+		api.GET("/accounts/:username", handlers.GetAccount)
+
+		// Group routes
+		api.POST("/groups", handlers.CreateGroup)
+		api.GET("/groups", handlers.GetGroups)
+	}
 
 	// Start the server
 	fmt.Println("Server starting on port 8080...")
