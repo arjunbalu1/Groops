@@ -1,6 +1,7 @@
 # Groops
 
 A group management platform where people can host and join groups with location-based features.
+pls refer to the sketch pdf lol
 
 ## UNDER CONSTRUCTION
 
