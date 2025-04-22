@@ -10,6 +10,7 @@ A group management platform where people can host and join groups with location-
 - Gin Web Framework
 - GORM ORM
 - PostgreSQL
+- JWT Authentication with secure cookies
 - RESTful API design
 
 ## Setup Instructions
@@ -43,7 +44,7 @@ createdb -U postgres groops
 go run cmd/server/main.go
 ```
 
-The server will start on port 8080 by default.
+The server will start on the port specified in your .env file (defaults to 8080).
 
 ## API Endpoints
 
@@ -51,13 +52,15 @@ The server will start on port 8080 by default.
 - `GET /health` - Check if the server is running
 - `GET /` - Welcome message
 
-### Accounts
+### Authentication
 - `POST /accounts` - Create a new account
-- `GET /accounts/:username` - Get account details
+- `POST /auth/login` - Login with username and password
+- `POST /auth/refresh` - Refresh access token using refresh token
 
-### Groups
-- `POST /groups` - Create a new group
-- `GET /groups` - List all groups
+### Protected Routes (requires authentication)
+- `GET /api/accounts/:username` - Get account details
+- `POST /api/groups` - Create a new group
+- `GET /api/groups` - List all groups
 
 ## Data Models
 
@@ -109,9 +112,24 @@ Tracks user activity:
 - `GroupID`
 - `Timestamp`
 
+## Security Implementation
+
+- **JWT Authentication**: Secure authentication using JWT tokens stored in HttpOnly cookies
+- **SameSite=Strict**: Cookies are protected against CSRF attacks
+- **Secure Flag**: Cookies are only sent over HTTPS connections
+- **Path Restriction**: Access tokens limited to API routes, refresh tokens to auth endpoint
+
+## Environment Variables
+
+Key environment variables:
+- `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`: Database configuration
+- `PORT`: Server port (defaults to 8080)
+- `JWT_SECRET`: Secret key for signing JWT tokens
+- `APP_ENV`: Application environment (development/production)
+
 ## Development Notes
 
-- Password hashing is currently not implemented for development purposes.
-- JWT authentication will be added in a future release.
-- Redis caching is configured but not currently used.
+- Password hashing is implemented using bcrypt
+- Environment variables are strictly validated at startup
+- Redis caching is configured but not currently used
 
