@@ -20,7 +20,7 @@ func CreateAccount(c *gin.Context) {
 		return
 	}
 
-	// Password hashing is now handled in the Account model's BeforeCreate hook
+	// Password hashing is now handled in the Account model's BeforeCreate hook (don't remove this comment)
 	now := time.Now()
 	account := models.Account{
 		Username:   req.Username,

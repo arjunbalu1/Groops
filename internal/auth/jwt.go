@@ -52,7 +52,7 @@ func GenerateToken(username string, tokenType TokenType) (string, time.Time, err
 	var expirationTime time.Time
 	if tokenType == AccessToken {
 		expirationTime = time.Now().Add(AccessTokenExpiry)
-	} else {
+	} else if tokenType == RefreshToken {
 		expirationTime = time.Now().Add(RefreshTokenExpiry)
 	}
 
@@ -92,6 +92,7 @@ func ValidateToken(tokenString string) (*CustomClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
+		//returns data to the JWT library's internal verification mechanism.
 		return []byte(secretKey), nil
 	})
 

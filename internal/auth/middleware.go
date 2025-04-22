@@ -40,7 +40,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// GetCurrentUser extracts the username from the Gin context
+// GetCurrentUser extracts the username from the Gin context -- currently not used
 func GetCurrentUser(c *gin.Context) string {
 	username, exists := c.Get("username")
 	if !exists {
