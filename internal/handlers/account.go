@@ -113,6 +113,9 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
+	// Set SameSite mode to Strict for all cookies
+	c.SetSameSite(http.SameSiteStrictMode)
+
 	// Set secure HttpOnly cookies
 	// Access token cookie
 	c.SetCookie(
@@ -175,6 +178,9 @@ func RefreshTokenHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
+
+	// Set SameSite mode to Strict
+	c.SetSameSite(http.SameSiteStrictMode)
 
 	// Set new access token cookie
 	c.SetCookie(

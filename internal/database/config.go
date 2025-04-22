@@ -8,7 +8,6 @@ import (
 
 	"groops/internal/models"
 
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -19,17 +18,12 @@ var DB *gorm.DB
 
 // InitDB initializes the database connection
 func InitDB() error {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: .env file not found: %v", err)
-	}
-
 	// Database connection parameters from environment variables
-	host := getEnvOrDefault("DB_HOST", "localhost")
-	user := getEnvOrDefault("DB_USER", "postgres")
-	password := getEnvOrDefault("DB_PASSWORD", "postgres")
-	dbname := getEnvOrDefault("DB_NAME", "groops")
-	port := getEnvOrDefault("DB_PORT", "5432")
+	host := getEnvRequired("DB_HOST")
+	user := getEnvRequired("DB_USER")
+	password := getEnvRequired("DB_PASSWORD")
+	dbname := getEnvRequired("DB_NAME")
+	port := getEnvRequired("DB_PORT")
 
 	// Connection string
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
@@ -86,12 +80,13 @@ func InitDB() error {
 	return nil
 }
 
-// getEnvOrDefault returns environment variable value or default if not set
-func getEnvOrDefault(key, defaultValue string) string {
+// getEnvRequired returns environment variable value or panics if not set
+func getEnvRequired(key string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
 	}
-	return defaultValue
+	log.Fatalf("Required environment variable %s is not set", key)
+	return "" // This line will never execute due to the log.Fatalf above
 }
 
 // GetDB returns the database instance
