@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"os"
 	"time"
 
@@ -34,21 +35,18 @@ type CustomClaims struct {
 }
 
 // GetSecretKey returns the JWT secret key from environment variables
-func GetSecretKey() (string, error) {
+func GetSecretKey() string {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		return "", errors.New("JWT_SECRET environment variable not set")
+		log.Fatal("JWT_SECRET environment variable not set")
 	}
-	return secret, nil
+	return secret
 }
 
 // GenerateToken creates a new JWT token
 func GenerateToken(username string, tokenType TokenType) (string, time.Time, error) {
 	// Get the secret key
-	secretKey, err := GetSecretKey()
-	if err != nil {
-		return "", time.Time{}, err
-	}
+	secretKey := GetSecretKey()
 
 	// Define token expiration based on type
 	var expirationTime time.Time
@@ -86,10 +84,7 @@ func GenerateToken(username string, tokenType TokenType) (string, time.Time, err
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*CustomClaims, error) {
 	// Get the secret key
-	secretKey, err := GetSecretKey()
-	if err != nil {
-		return nil, err
-	}
+	secretKey := GetSecretKey()
 
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {

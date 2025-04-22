@@ -3,16 +3,26 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"groops/internal/auth"
 	"groops/internal/database"
 	"groops/internal/handlers"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 // This is our main function - the entry point of our application
 func main() {
+	// Load environment variables from project root
+	if err := godotenv.Load("../../.env"); err != nil {
+		// Try standard location as fallback
+		if err := godotenv.Load(); err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
+	}
+
 	// Initialize database
 	database.InitDB()
 
@@ -44,8 +54,12 @@ func main() {
 	}
 
 	// Start the server
-	fmt.Println("Server starting on port 8080...")
-	if err := router.Run(":8080"); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Printf("Server starting on port %s...\n", port)
+	if err := router.Run(":" + port); err != nil {
 		log.Fatal(err)
 	}
 }
