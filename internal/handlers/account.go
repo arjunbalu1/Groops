@@ -1,8 +1,12 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
+	"unicode"
 
 	"groops/internal/auth"
 	"groops/internal/database"
@@ -12,11 +16,41 @@ import (
 	"gorm.io/gorm"
 )
 
+// validatePassword checks if password meets security requirements
+func validatePassword(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters long")
+	}
+
+	hasLetter := false
+	hasNumber := false
+
+	for _, char := range password {
+		if unicode.IsLetter(char) {
+			hasLetter = true
+		} else if unicode.IsNumber(char) {
+			hasNumber = true
+		}
+
+		if hasLetter && hasNumber {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("password must contain at least one letter and one number")
+}
+
 // CreateAccount handles new user registration
 func CreateAccount(c *gin.Context) {
 	var req models.CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		handleError(c, http.StatusBadRequest, "Invalid input", err)
+		return
+	}
+
+	// Validate password strength
+	if err := validatePassword(req.Password); err != nil {
+		handleError(c, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
@@ -35,24 +69,23 @@ func CreateAccount(c *gin.Context) {
 
 	db := database.GetDB()
 	if err := db.Create(&account).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// Check for common database errors like duplicate usernames
+		if strings.Contains(err.Error(), "duplicate key") {
+			if strings.Contains(err.Error(), "username") {
+				handleError(c, http.StatusConflict, "Username already exists", err)
+			} else if strings.Contains(err.Error(), "email") {
+				handleError(c, http.StatusConflict, "Email already in use", err)
+			} else {
+				handleError(c, http.StatusConflict, "Account creation failed: duplicate data", err)
+			}
+			return
+		}
+
+		handleError(c, http.StatusInternalServerError, "Failed to create account", err)
 		return
 	}
 
 	c.JSON(http.StatusCreated, account)
-}
-
-// LogActivity adds a new activity to user's history
-func LogActivity(username string, eventType string, groupID string) error {
-	activity := models.ActivityLog{
-		Username:  username,
-		EventType: eventType,
-		GroupID:   groupID,
-		Timestamp: time.Now(),
-	}
-
-	db := database.GetDB()
-	return db.Create(&activity).Error
 }
 
 // GetAccount retrieves account information
@@ -64,10 +97,10 @@ func GetAccount(c *gin.Context) {
 	if err := db.Preload("Activities").Preload("OwnedGroups").Preload("JoinedGroups").
 		Where("username = ?", username).First(&account).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+			handleError(c, http.StatusNotFound, "Account not found", err)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		handleError(c, http.StatusInternalServerError, "Failed to retrieve account", err)
 		return
 	}
 
@@ -78,7 +111,7 @@ func GetAccount(c *gin.Context) {
 func LoginHandler(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		handleError(c, http.StatusBadRequest, "Invalid login request", err)
 		return
 	}
 
@@ -86,30 +119,31 @@ func LoginHandler(c *gin.Context) {
 	db := database.GetDB()
 	var account models.Account
 	if err := db.Where("username = ?", req.Username).First(&account).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			handleError(c, http.StatusUnauthorized, "Invalid credentials", err)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		handleError(c, http.StatusInternalServerError, "Login attempt failed", err)
 		return
 	}
 
 	// Verify the password
 	if !account.VerifyPassword(req.Password) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		handleError(c, http.StatusUnauthorized, "Invalid credentials",
+			fmt.Errorf("password verification failed for user %s", req.Username))
 		return
 	}
 
 	// Generate JWT tokens
 	accessToken, accessExpiry, err := auth.GenerateToken(account.Username, auth.AccessToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate access token"})
+		handleError(c, http.StatusInternalServerError, "Failed to generate access token", err)
 		return
 	}
 
 	refreshToken, refreshExpiry, err := auth.GenerateToken(account.Username, auth.RefreshToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate refresh token"})
+		handleError(c, http.StatusInternalServerError, "Failed to generate refresh token", err)
 		return
 	}
 
@@ -155,27 +189,28 @@ func RefreshTokenHandler(c *gin.Context) {
 	// Get refresh token from cookie
 	refreshToken, err := c.Cookie(auth.RefreshTokenCookieName)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token required"})
+		handleError(c, http.StatusUnauthorized, "Refresh token required", err)
 		return
 	}
 
 	// Validate the refresh token
 	claims, err := auth.ValidateToken(refreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+		handleError(c, http.StatusUnauthorized, "Invalid refresh token", err)
 		return
 	}
 
 	// Ensure it's a refresh token
 	if claims.TokenType != auth.RefreshToken {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token type"})
+		handleError(c, http.StatusUnauthorized, "Invalid token type",
+			fmt.Errorf("token type mismatch: expected refresh, got %s", claims.TokenType))
 		return
 	}
 
 	// Generate a new access token
 	accessToken, accessExpiry, err := auth.GenerateToken(claims.Username, auth.AccessToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		handleError(c, http.StatusInternalServerError, "Failed to generate token", err)
 		return
 	}
 
