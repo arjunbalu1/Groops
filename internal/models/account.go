@@ -11,7 +11,7 @@ import (
 type ActivityLog struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Username  string    `gorm:"size:30;not null;index" json:"username"`
-	EventType string    `gorm:"size:20;not null" json:"event_type"` // create_group, join_group, leave_group
+	EventType string    `gorm:"size:20;not null" json:"event_type"` 
 	GroupID   string    `gorm:"size:50;not null" json:"group_id"`
 	Timestamp time.Time `gorm:"not null;index" json:"timestamp"`
 }

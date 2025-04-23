@@ -133,3 +133,101 @@ func LogActivity(username string, eventType string, groupID string) error {
 	// If we got here, all attempts failed
 	return fmt.Errorf("failed to log activity after 3 attempts: %v", err)
 }
+
+// JoinGroup handles a user's request to join a group
+func JoinGroup(c *gin.Context) {
+	groupID := c.Param("group_id")
+	username := c.GetString("username") // Set by auth middleware
+
+	db := database.GetDB()
+
+	// Check if group exists
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Group not found", err)
+		return
+	}
+
+	// Check if user is already a member
+	var member models.GroupMember
+	if err := db.Where("group_id = ? AND username = ?", groupID, username).First(&member).Error; err == nil {
+		if member.Status == "approved" {
+			handleError(c, http.StatusConflict, "Already a member", nil)
+			return
+		} else if member.Status == "pending" {
+			handleError(c, http.StatusConflict, "Join request already pending", nil)
+			return
+		}
+	}
+
+	// Check if group is full (approved members)
+	var approvedCount int64
+	db.Model(&models.GroupMember{}).Where("group_id = ? AND status = ?", groupID, "approved").Count(&approvedCount)
+	if int(approvedCount) >= group.MaxMembers {
+		handleError(c, http.StatusForbidden, "Group is full", nil)
+		return
+	}
+
+	// Create join request (pending status)
+	newMember := models.GroupMember{
+		GroupID:   groupID,
+		Username:  username,
+		Status:    "pending",
+		JoinedAt:  time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := db.Create(&newMember).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to request to join group", err)
+		return
+	}
+
+	// Log activity
+	_ = LogActivity(username, "join_group_request", groupID)
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Join request submitted"})
+}
+
+// LeaveGroup handles a user's request to leave a group
+func LeaveGroup(c *gin.Context) {
+	groupID := c.Param("group_id")
+	username := c.GetString("username") // Set by auth middleware
+
+	db := database.GetDB()
+
+	// Check if group exists
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Group not found", err)
+		return
+	}
+
+	// Prevent organizer from leaving their own group
+	if group.OrganiserID == username {
+		handleError(c, http.StatusForbidden, "Organizer cannot leave their own group", nil)
+		return
+	}
+
+	// Check if user is a member
+	var member models.GroupMember
+	if err := db.Where("group_id = ? AND username = ?", groupID, username).First(&member).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Not a group member", err)
+		return
+	}
+
+	// Only allow approved or pending members to leave
+	if member.Status != "approved" && member.Status != "pending" {
+		handleError(c, http.StatusForbidden, "Cannot leave group with current status", nil)
+		return
+	}
+
+	// Remove membership (delete row)
+	if err := db.Delete(&member).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to leave group", err)
+		return
+	}
+
+	// Log activity
+	_ = LogActivity(username, "leave_group", groupID)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Left group successfully"})
+}
