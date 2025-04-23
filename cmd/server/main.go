@@ -13,7 +13,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// This is our main function - the entry point of our application
 func main() {
 	// Load environment variables from project root
 	if err := godotenv.Load("../../.env"); err != nil {
@@ -53,6 +52,8 @@ func main() {
 		// Group routes
 		api.POST("/groups", handlers.CreateGroup)
 		api.GET("/groups", handlers.GetGroups)
+		api.POST("/groups/:group_id/join", handlers.JoinGroup)
+		api.POST("/groups/:group_id/leave", handlers.LeaveGroup)
 	}
 
 	// Start the server
