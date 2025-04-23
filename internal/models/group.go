@@ -68,10 +68,10 @@ type Group struct {
 	DateTime     time.Time      `gorm:"index;not null" json:"date_time"`
 	Venue        Venue          `gorm:"type:jsonb;not null" json:"venue"`
 	Cost         float64        `gorm:"type:decimal(10,2);not null;default:0.0" json:"cost"`
-	SkillLevel   SkillLevel     `gorm:"type:varchar(20);not null;default:'beginner'" json:"skill_level"`
+	SkillLevel   SkillLevel     `gorm:"type:varchar(20);index;not null;default:'beginner'" json:"skill_level"`
 	ActivityType ActivityType   `gorm:"type:varchar(20);index;not null" json:"activity_type"`
 	MaxMembers   int            `gorm:"type:integer;not null;default:10" json:"max_members"`
-	Description  string         `gorm:"type:text;not null" json:"description"`
+	Description  string         `gorm:"type:text;not null;size:1000" json:"description"`
 	OrganiserID  string         `gorm:"index;size:30;not null" json:"organiser_id"`
 	Members      []GroupMember  `gorm:"foreignKey:GroupID" json:"members"`
 	CreatedAt    time.Time      `gorm:"not null" json:"created_at"`
@@ -133,10 +133,10 @@ type CreateGroupRequest struct {
 	Name              string       `json:"name" binding:"required"`
 	DateTime          time.Time    `json:"date_time" binding:"required"`
 	Venue             Venue        `json:"venue" binding:"required"`
-	Cost              float64      `json:"cost" binding:"required,min=0"`
+	Cost              float64      `json:"cost" binding:"required,min=0,max=10000"`
 	SkillLevel        SkillLevel   `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
 	ActivityType      ActivityType `json:"activity_type" binding:"required,oneof=sport social games other"`
 	MaxMembers        int          `json:"max_members" binding:"required,min=2"`
-	Description       string       `json:"description" binding:"required"`
+	Description       string       `json:"description" binding:"required,max=1000"`
 	OrganizerUsername string       `json:"organizer_username" binding:"required"`
 }

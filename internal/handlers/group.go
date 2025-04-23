@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
 	"log"
@@ -18,16 +19,23 @@ func CreateGroup(c *gin.Context) {
 		Name              string       `json:"name" binding:"required"`
 		DateTime          time.Time    `json:"date_time" binding:"required"`
 		Venue             models.Venue `json:"venue" binding:"required"`
-		Cost              float64      `json:"cost" binding:"required,min=0"`
+		Cost              float64      `json:"cost" binding:"required,min=0,max=10000"`
 		SkillLevel        string       `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
 		ActivityType      string       `json:"activity_type" binding:"required,oneof=sport social games other"`
 		MaxMembers        int          `json:"max_members" binding:"required,min=2"`
-		Description       string       `json:"description" binding:"required"`
+		Description       string       `json:"description" binding:"required,max=1000"`
 		OrganizerUsername string       `json:"organizer_username" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		handleError(c, http.StatusBadRequest, fmt.Sprintf("Invalid input: %s", err.Error()), err)
+		return
+	}
+
+	// Validate that DateTime is in the future
+	if request.DateTime.Before(time.Now()) {
+		handleError(c, http.StatusBadRequest, "Event date must be in the future",
+			fmt.Errorf("event date %v is before current time", request.DateTime))
 		return
 	}
 
@@ -37,10 +45,10 @@ func CreateGroup(c *gin.Context) {
 	var organizer models.Account
 	if err := db.Where("username = ?", request.OrganizerUsername).First(&organizer).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "organizer not found"})
+			handleError(c, http.StatusNotFound, "Organizer not found", err)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to find organizer"})
+		handleError(c, http.StatusInternalServerError, "Unable to verify organizer", err)
 		return
 	}
 
@@ -60,7 +68,7 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	if err := db.Create(&group).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create group"})
+		handleError(c, http.StatusInternalServerError, "Failed to create group", err)
 		return
 	}
 
@@ -74,21 +82,14 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	if err := db.Create(&member).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add organizer as member"})
+		handleError(c, http.StatusInternalServerError, "Failed to add organizer as member", err)
 		return
 	}
 
 	// Log the activity
-	activity := models.ActivityLog{
-		Username:  organizer.Username,
-		EventType: "create_group",
-		GroupID:   group.ID,
-		Timestamp: time.Now(),
-	}
-
-	if err := db.Create(&activity).Error; err != nil {
-		// Log error but don't fail the request
-		log.Printf("failed to log activity: %v", err)
+	if err := LogActivity(organizer.Username, "create_group", group.ID); err != nil {
+		// Log but don't fail the request
+		log.Printf("Warning: Failed to log activity: %v", err)
 	}
 
 	c.JSON(http.StatusCreated, group)
@@ -100,9 +101,35 @@ func GetGroups(c *gin.Context) {
 	var groups []models.Group
 
 	if err := db.Preload("Members").Find(&groups).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch groups"})
+		handleError(c, http.StatusInternalServerError, "Failed to fetch groups", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, groups)
+}
+
+// LogActivity adds a new activity to user's history with retry logic
+func LogActivity(username string, eventType string, groupID string) error {
+	activity := models.ActivityLog{
+		Username:  username,
+		EventType: eventType,
+		GroupID:   groupID,
+		Timestamp: time.Now(),
+	}
+
+	db := database.GetDB()
+
+	// Try up to 3 times
+	var err error
+	for attempts := 0; attempts < 3; attempts++ {
+		if err = db.Create(&activity).Error; err != nil {
+			log.Printf("Failed to log activity (attempt %d/3): %v", attempts+1, err)
+			time.Sleep(time.Second * time.Duration(attempts+1)) // Backoff
+			continue
+		}
+		return nil
+	}
+
+	// If we got here, all attempts failed
+	return fmt.Errorf("failed to log activity after 3 attempts: %v", err)
 }

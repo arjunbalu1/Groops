@@ -14,6 +14,14 @@ pls refer to the sketch pdf lol
 - JWT Authentication with secure cookies
 - RESTful API design
 
+## Features
+
+- **User Authentication** - Secure login and registration with JWT tokens
+- **Group Creation & Management** - Create and organize groups for different activities
+- **Activity Tracking** - Track user participation in groups
+- **Location-Based Features** - Find groups based on proximity
+- **Enhanced Security** - Password strength enforcement, secure cookies, and input validation
+
 ## Setup Instructions
 
 ### Prerequisites
@@ -119,6 +127,37 @@ Tracks user activity:
 - **SameSite=Strict**: Cookies are protected against CSRF attacks
 - **Secure Flag**: Cookies are only sent over HTTPS connections
 - **Path Restriction**: Access tokens limited to API routes, refresh tokens to auth endpoint
+- **Password Requirements**: Minimum 8 characters with at least one letter and one number
+- **Error Handling**: Consistent error handling with appropriate user messages
+- **Input Validation**: Comprehensive validation for all user inputs
+
+## Data Validation
+
+- **Group Creation**:
+  - Future dates validation for events
+  - Cost range validation (min 0, max 10000)
+  - Description length limits
+  - Activity type and skill level validation
+
+- **User Registration**:
+  - Username format validation (alphanumeric, 3-30 chars)
+  - Email format validation
+  - Password strength validation
+  - Duplicate detection for username/email
+
+## Error Handling
+
+The application implements a centralized error handling approach that:
+- Provides clear, user-friendly error messages
+- Logs detailed error information for debugging
+- Handles common error types (not found, validation, etc.)
+- Returns appropriate HTTP status codes
+
+## Performance Optimizations
+
+- **Database Indexes**: Strategic indexes on frequently queried fields
+- **Reliable Activity Logging**: Retry logic with exponential backoff for activity logs
+- **GORM Optimizations**: Prepared statement caching and connection pooling
 
 ## Environment Variables
 
