@@ -54,6 +54,11 @@ func main() {
 		api.GET("/groups", handlers.GetGroups)
 		api.POST("/groups/:group_id/join", handlers.JoinGroup)
 		api.POST("/groups/:group_id/leave", handlers.LeaveGroup)
+
+		// New endpoints for organiser actions
+		api.GET("/groups/:group_id/pending-members", handlers.ListPendingMembers)
+		api.POST("/groups/:group_id/members/:username/approve", handlers.ApproveJoinRequest)
+		api.POST("/groups/:group_id/members/:username/reject", handlers.RejectJoinRequest)
 	}
 
 	// Start the server
