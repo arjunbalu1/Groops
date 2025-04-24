@@ -231,3 +231,112 @@ func LeaveGroup(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Left group successfully"})
 }
+
+// ListPendingMembers returns all pending join requests for a group (organiser only)
+func ListPendingMembers(c *gin.Context) {
+	groupID := c.Param("group_id")
+	requester := c.GetString("username")
+
+	db := database.GetDB()
+
+	// Check if group exists and get organiser
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Group not found", err)
+		return
+	}
+
+	// Only organiser can view pending members
+	if group.OrganiserID != requester {
+		handleError(c, http.StatusForbidden, "Only organiser can view pending members", nil)
+		return
+	}
+
+	var pendingMembers []models.GroupMember
+	if err := db.Where("group_id = ? AND status = ?", groupID, "pending").Find(&pendingMembers).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to fetch pending members", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, pendingMembers)
+}
+
+// ApproveJoinRequest allows organiser to approve a pending join request
+func ApproveJoinRequest(c *gin.Context) {
+	groupID := c.Param("group_id")
+	username := c.Param("username")
+	requester := c.GetString("username")
+
+	db := database.GetDB()
+
+	// Check if group exists and get organiser
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Group not found", err)
+		return
+	}
+	if group.OrganiserID != requester {
+		handleError(c, http.StatusForbidden, "Only organiser can approve members", nil)
+		return
+	}
+
+	// Find the pending member
+	var member models.GroupMember
+	if err := db.Where("group_id = ? AND username = ? AND status = ?", groupID, username, "pending").First(&member).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Pending join request not found", err)
+		return
+	}
+
+	// Check if group is full (approved members)
+	var approvedCount int64
+	db.Model(&models.GroupMember{}).Where("group_id = ? AND status = ?", groupID, "approved").Count(&approvedCount)
+	if int(approvedCount) >= group.MaxMembers {
+		handleError(c, http.StatusForbidden, "Group is full", nil)
+		return
+	}
+
+	// Approve the member
+	if err := db.Model(&member).Update("status", "approved").Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to approve member", err)
+		return
+	}
+
+	_ = LogActivity(username, "join_group_approved", groupID)
+	c.JSON(http.StatusOK, gin.H{"message": "Member approved"})
+}
+
+// RejectJoinRequest allows organiser to reject a pending join request
+func RejectJoinRequest(c *gin.Context) {
+	groupID := c.Param("group_id")
+	username := c.Param("username")
+	requester := c.GetString("username")
+
+	db := database.GetDB()
+
+	// Check if group exists and get organiser
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Group not found", err)
+		return
+	}
+	if group.OrganiserID != requester {
+		handleError(c, http.StatusForbidden, "Only organiser can reject members", nil)
+		return
+	}
+
+	// Find the pending member
+	var member models.GroupMember
+	if err := db.Where("group_id = ? AND username = ? AND status = ?", groupID, username, "pending").First(&member).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Pending join request not found", err)
+		return
+	}
+
+	// Reject the member (update status or delete row)
+	if err := db.Model(&member).Update("status", "rejected").Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to reject member", err)
+		return
+	}
+
+	_ = LogActivity(username, "join_group_rejected", groupID)
+	c.JSON(http.StatusOK, gin.H{"message": "Member rejected"})
+}
