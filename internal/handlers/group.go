@@ -15,17 +15,7 @@ import (
 
 // CreateGroup handles the creation of a new group
 func CreateGroup(c *gin.Context) {
-	var request struct {
-		Name              string       `json:"name" binding:"required"`
-		DateTime          time.Time    `json:"date_time" binding:"required"`
-		Venue             models.Venue `json:"venue" binding:"required"`
-		Cost              float64      `json:"cost" binding:"required,min=0,max=10000"`
-		SkillLevel        string       `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
-		ActivityType      string       `json:"activity_type" binding:"required,oneof=sport social games other"`
-		MaxMembers        int          `json:"max_members" binding:"required,min=2"`
-		Description       string       `json:"description" binding:"required,max=1000"`
-		OrganizerUsername string       `json:"organizer_username" binding:"required"`
-	}
+	var request models.CreateGroupRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		handleError(c, http.StatusBadRequest, fmt.Sprintf("Invalid input: %s", err.Error()), err)
