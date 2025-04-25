@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -65,6 +66,8 @@ func CreateAccount(c *gin.Context) {
 		LastLogin:  now,
 		CreatedAt:  now,
 		UpdatedAt:  now,
+		Bio:        req.Bio,
+		AvatarURL:  req.AvatarURL,
 	}
 
 	db := database.GetDB()
@@ -278,4 +281,59 @@ func UpdateAccount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, account)
+}
+
+// GetAccountEventHistory returns a user's event/activity history
+func GetAccountEventHistory(c *gin.Context) {
+	username := c.Param("username")
+	db := database.GetDB()
+
+	var activities []models.ActivityLog
+	if err := db.Where("username = ?", username).Order("timestamp DESC").Find(&activities).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to fetch event history", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, activities)
+}
+
+// ListNotifications returns recent notifications for the logged-in user
+func ListNotifications(c *gin.Context) {
+	username := c.GetString("username")
+	db := database.GetDB()
+
+	var notifications []models.Notification
+	query := db.Where("recipient_username = ?", username).Order("created_at DESC")
+
+	if c.Query("unread") == "true" {
+		query = query.Where("read = ?", false)
+	}
+	limit := 10
+	if l := c.Query("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+	query = query.Limit(limit)
+
+	if err := query.Find(&notifications).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to fetch notifications", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, notifications)
+}
+
+// GetUnreadNotificationCount returns the unread notification count for the logged-in user
+func GetUnreadNotificationCount(c *gin.Context) {
+	username := c.GetString("username")
+	db := database.GetDB()
+
+	var count int64
+	if err := db.Model(&models.Notification{}).Where("recipient_username = ? AND read = ?", username, false).Count(&count).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to fetch unread count", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"unread_count": count})
 }

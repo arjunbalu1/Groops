@@ -117,3 +117,15 @@ type UpdateAccountRequest struct {
 	Bio       string `json:"bio"`
 	AvatarURL string `json:"avatar_url"`
 }
+
+// Notification represents a user notification in the system
+// Used for in-app notifications (e.g., join requests, approvals, etc.)
+type Notification struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	RecipientUsername string    `gorm:"size:30;not null;index" json:"recipient_username"`
+	Type              string    `gorm:"size:30;not null" json:"type"`
+	Message           string    `gorm:"type:text;not null" json:"message"`
+	GroupID           string    `gorm:"size:50" json:"group_id"`
+	CreatedAt         time.Time `gorm:"not null" json:"created_at"`
+	Read              bool      `gorm:"not null;default:false" json:"read"`
+}

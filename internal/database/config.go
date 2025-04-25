@@ -72,6 +72,7 @@ func InitDB() error {
 		&models.Group{},
 		&models.GroupMember{},
 		&models.ActivityLog{},
+		&models.Notification{},
 	); err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}
@@ -93,4 +94,3 @@ func getEnvRequired(key string) string {
 func GetDB() *gorm.DB {
 	return DB
 }
-

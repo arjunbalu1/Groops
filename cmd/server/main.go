@@ -46,11 +46,13 @@ func main() {
 	{
 		// Account routes
 		api.GET("/accounts/:username", handlers.GetAccount)
+		api.GET("/accounts/:username/history", handlers.GetAccountEventHistory)
 		api.PUT("/accounts/:username", handlers.UpdateAccount)
 
 		// Group routes
 		api.POST("/groups", handlers.CreateGroup)
 		api.GET("/groups", handlers.GetGroups)
+		api.GET("/groups/:group_id", handlers.GetGroupByID)
 		api.POST("/groups/:group_id/join", handlers.JoinGroup)
 		api.POST("/groups/:group_id/leave", handlers.LeaveGroup)
 
@@ -58,6 +60,10 @@ func main() {
 		api.GET("/groups/:group_id/pending-members", handlers.ListPendingMembers)
 		api.POST("/groups/:group_id/members/:username/approve", handlers.ApproveJoinRequest)
 		api.POST("/groups/:group_id/members/:username/reject", handlers.RejectJoinRequest)
+
+		// Notification routes
+		api.GET("/notifications", handlers.ListNotifications)
+		api.GET("/notifications/unread-count", handlers.GetUnreadNotificationCount)
 	}
 
 	// Start the server
@@ -70,7 +76,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-
-
-
-
