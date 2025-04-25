@@ -386,3 +386,36 @@ func RejectJoinRequest(c *gin.Context) {
 	_ = LogActivity(username, "join_group_rejected", groupID)
 	c.JSON(http.StatusOK, gin.H{"message": "Member rejected"})
 }
+
+// GetGroupByID handles fetching a single group's details by ID
+func GetGroupByID(c *gin.Context) {
+	groupID := c.Param("group_id")
+	db := database.GetDB()
+
+	var group models.Group
+	// Preload organiser and members
+	if err := db.Preload("Members").Where("id = ?", groupID).First(&group).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Group not found", err)
+		return
+	}
+
+	// Fetch organiser info
+	var organiser models.Account
+	if err := db.Where("username = ?", group.OrganiserID).First(&organiser).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to fetch organiser info", err)
+		return
+	}
+
+	// Prepare response
+	response := gin.H{
+		"group": group,
+		"organiser": gin.H{
+			"username":   organiser.Username,
+			"rating":     organiser.Rating,
+			"avatar_url": organiser.AvatarURL,
+			"bio":        organiser.Bio,
+		},
+	}
+
+	c.JSON(http.StatusOK, response)
+}
