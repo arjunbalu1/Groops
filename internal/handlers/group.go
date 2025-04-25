@@ -7,6 +7,7 @@ import (
 	"groops/internal/models"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -85,12 +86,67 @@ func CreateGroup(c *gin.Context) {
 	c.JSON(http.StatusCreated, group)
 }
 
-// GetGroups handles listing all groups
+// GetGroups handles listing all groups with filtering, sorting, and pagination
 func GetGroups(c *gin.Context) {
 	db := database.GetDB()
 	var groups []models.Group
 
-	if err := db.Preload("Members").Find(&groups).Error; err != nil {
+	query := db.Preload("Members")
+
+	// Filtering
+	if activityType := c.Query("activity_type"); activityType != "" {
+		query = query.Where("activity_type = ?", activityType)
+	}
+	if skillLevel := c.Query("skill_level"); skillLevel != "" {
+		query = query.Where("skill_level = ?", skillLevel)
+	}
+	if minPrice := c.Query("min_price"); minPrice != "" {
+		query = query.Where("cost >= ?", minPrice)
+	}
+	if maxPrice := c.Query("max_price"); maxPrice != "" {
+		query = query.Where("cost <= ?", maxPrice)
+	}
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		query = query.Where("date_time >= ?", dateFrom)
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		query = query.Where("date_time <= ?", dateTo)
+	}
+	if organiserID := c.Query("organiser_id"); organiserID != "" {
+		query = query.Where("organiser_id = ?", organiserID)
+	}
+	if minMembers := c.Query("min_members"); minMembers != "" {
+		query = query.Where("max_members >= ?", minMembers)
+	}
+	if maxMembers := c.Query("max_members"); maxMembers != "" {
+		query = query.Where("max_members <= ?", maxMembers)
+	}
+	if name := c.Query("name"); name != "" {
+		query = query.Where("name ILIKE ?", "%"+name+"%")
+	}
+
+	// Sorting
+	sortBy := c.DefaultQuery("sort_by", "date_time")
+	sortOrder := c.DefaultQuery("sort_order", "asc")
+	query = query.Order(fmt.Sprintf("%s %s", sortBy, sortOrder))
+
+	// Pagination with defaults
+	limitStr := c.DefaultQuery("limit", "10")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, err1 := strconv.Atoi(limitStr)
+	if err1 != nil || limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100 // max limit
+	}
+	offset, err2 := strconv.Atoi(offsetStr)
+	if err2 != nil || offset < 0 {
+		offset = 0
+	}
+	query = query.Limit(limit).Offset(offset)
+
+	if err := query.Find(&groups).Error; err != nil {
 		handleError(c, http.StatusInternalServerError, "Failed to fetch groups", err)
 		return
 	}

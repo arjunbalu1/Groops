@@ -133,7 +133,7 @@ type CreateGroupRequest struct {
 	Name              string       `json:"name" binding:"required"`
 	DateTime          time.Time    `json:"date_time" binding:"required"`
 	Venue             Venue        `json:"venue" binding:"required"`
-	Cost              float64      `json:"cost" binding:"required,min=0,max=10000"`
+	Cost              float64      `json:"cost"`
 	SkillLevel        SkillLevel   `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
 	ActivityType      ActivityType `json:"activity_type" binding:"required,oneof=sport social games other"`
 	MaxMembers        int          `json:"max_members" binding:"required,min=2"`
