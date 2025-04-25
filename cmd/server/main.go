@@ -48,6 +48,7 @@ func main() {
 	{
 		// Account routes
 		api.GET("/accounts/:username", handlers.GetAccount)
+		api.PUT("/accounts/:username", handlers.UpdateAccount)
 
 		// Group routes
 		api.POST("/groups", handlers.CreateGroup)
@@ -71,3 +72,7 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+
+
+

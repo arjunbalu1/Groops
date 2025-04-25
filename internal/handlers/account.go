@@ -234,3 +234,48 @@ func RefreshTokenHandler(c *gin.Context) {
 		"access_token_expires": accessExpiry,
 	})
 }
+
+// UpdateAccount allows a user to update their profile (bio, avatar_url)
+func UpdateAccount(c *gin.Context) {
+	username := c.Param("username")
+	requester := c.GetString("username")
+
+	// Only the user themselves can update their profile
+	if username != requester {
+		handleError(c, http.StatusForbidden, "You can only update your own profile", nil)
+		return
+	}
+
+	var req models.UpdateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		handleError(c, http.StatusBadRequest, "Invalid input", err)
+		return
+	}
+
+	db := database.GetDB()
+	var account models.Account
+	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Account not found", err)
+		return
+	}
+
+	// Update only provided fields
+	updates := make(map[string]interface{})
+	if req.Bio != "" {
+		updates["bio"] = req.Bio
+	}
+	if req.AvatarURL != "" {
+		updates["avatar_url"] = req.AvatarURL
+	}
+	if len(updates) == 0 {
+		handleError(c, http.StatusBadRequest, "No fields to update", nil)
+		return
+	}
+
+	if err := db.Model(&account).Updates(updates).Error; err != nil {
+		handleError(c, http.StatusInternalServerError, "Failed to update profile", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, account)
+}
