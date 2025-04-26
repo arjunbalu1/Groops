@@ -321,6 +321,19 @@ func ListNotifications(c *gin.Context) {
 		return
 	}
 
+	// Mark unread notifications as read if any are returned
+	if len(notifications) > 0 {
+		var ids []uint
+		for _, n := range notifications {
+			if !n.Read {
+				ids = append(ids, n.ID)
+			}
+		}
+		if len(ids) > 0 {
+			db.Model(&models.Notification{}).Where("id IN ?", ids).Update("read", true)
+		}
+	}
+
 	c.JSON(http.StatusOK, notifications)
 }
 
