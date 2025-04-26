@@ -180,6 +180,19 @@ func LogActivity(username string, eventType string, groupID string) error {
 	return fmt.Errorf("failed to log activity after 3 attempts: %v", err)
 }
 
+// Helper to create a notification
+func createNotification(db *gorm.DB, recipient, notifType, message, groupID string) error {
+	notif := models.Notification{
+		RecipientUsername: recipient,
+		Type:              notifType,
+		Message:           message,
+		GroupID:           groupID,
+		CreatedAt:         time.Now(),
+		Read:              false,
+	}
+	return db.Create(&notif).Error
+}
+
 // JoinGroup handles a user's request to join a group
 func JoinGroup(c *gin.Context) {
 	groupID := c.Param("group_id")
@@ -230,6 +243,10 @@ func JoinGroup(c *gin.Context) {
 	// Log activity
 	_ = LogActivity(username, "join_group_request", groupID)
 
+	// Notify organiser
+	msg := username + " requested to join your group '" + group.Name + "'"
+	_ = createNotification(db, group.OrganiserID, "join_request", msg, groupID)
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Join request submitted"})
 }
 
@@ -274,6 +291,10 @@ func LeaveGroup(c *gin.Context) {
 
 	// Log activity
 	_ = LogActivity(username, "leave_group", groupID)
+
+	// Notify organiser
+	msg := username + " has left your group '" + group.Name + "'"
+	_ = createNotification(db, group.OrganiserID, "leave_group", msg, groupID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Left group successfully"})
 }
@@ -348,6 +369,11 @@ func ApproveJoinRequest(c *gin.Context) {
 	}
 
 	_ = LogActivity(username, "join_group_approved", groupID)
+
+	// Notify user
+	msg := "Your request to join group '" + group.Name + "' was approved"
+	_ = createNotification(db, username, "join_approved", msg, groupID)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Member approved"})
 }
 
@@ -384,6 +410,11 @@ func RejectJoinRequest(c *gin.Context) {
 	}
 
 	_ = LogActivity(username, "join_group_rejected", groupID)
+
+	// Notify user
+	msg := "Your request to join group '" + group.Name + "' was rejected"
+	_ = createNotification(db, username, "join_rejected", msg, groupID)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Member rejected"})
 }
 
