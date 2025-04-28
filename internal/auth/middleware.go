@@ -36,11 +36,6 @@ func InitOAuth() error {
 		Endpoint:     google.Endpoint,
 	}
 
-	// Register the Session model with the database
-	if err := database.GetDB().AutoMigrate(&models.Session{}); err != nil {
-		return fmt.Errorf("failed to migrate Session model: %w", err)
-	}
-
 	return nil
 }
 
