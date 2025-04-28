@@ -22,6 +22,11 @@ func main() {
 		}
 	}
 
+	// Initialize Google OAuth
+	if err := auth.InitOAuth(); err != nil {
+		log.Fatalf("Failed to initialize Google OAuth: %v", err)
+	}
+
 	// Initialize database
 	database.InitDB()
 
@@ -35,12 +40,20 @@ func main() {
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
 
-	// Authentication routes
-	router.POST("/accounts", handlers.CreateAccount)
-	router.POST("/auth/login", handlers.LoginHandler)
-	router.POST("/auth/refresh", handlers.RefreshTokenHandler)
+	// Auth routes
+	router.GET("/auth/login", handlers.LoginHandler)
+	router.GET("/auth/google/callback", handlers.GoogleCallbackHandler)
+	router.GET("/auth/logout", handlers.LogoutHandler)
 
-	// Protected API routes
+	// Account creation page - requires authentication but not a full user profile
+	authPageGroup := router.Group("/")
+	authPageGroup.Use(auth.AuthMiddleware())
+	{
+		authPageGroup.GET("/create-profile", handlers.CreateProfilePageHandler)
+		authPageGroup.GET("/dashboard", handlers.DashboardHandler)
+	}
+
+	// Protected API routes - require authentication with a full user profile
 	api := router.Group("/api")
 	api.Use(auth.AuthMiddleware())
 	{
@@ -64,6 +77,9 @@ func main() {
 		// Notification routes
 		api.GET("/notifications", handlers.ListNotifications)
 		api.GET("/notifications/unread-count", handlers.GetUnreadNotificationCount)
+
+		// Profile registration for Google OAuth users
+		api.POST("/profile/register", handlers.CreateProfile)
 	}
 
 	// Start the server

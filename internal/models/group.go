@@ -63,20 +63,19 @@ type GroupMember struct {
 
 // Group represents a group in the system
 type Group struct {
-	ID           string         `gorm:"primaryKey;size:50;not null" json:"id"`
-	Name         string         `gorm:"index;size:100;not null" json:"name"`
-	DateTime     time.Time      `gorm:"index;not null" json:"date_time"`
-	Venue        Venue          `gorm:"type:jsonb;not null" json:"venue"`
-	Cost         float64        `gorm:"type:decimal(10,2);not null;default:0.0" json:"cost"`
-	SkillLevel   SkillLevel     `gorm:"type:varchar(20);index;not null;default:'beginner'" json:"skill_level"`
-	ActivityType ActivityType   `gorm:"type:varchar(20);index;not null" json:"activity_type"`
-	MaxMembers   int            `gorm:"type:integer;not null;default:10" json:"max_members"`
-	Description  string         `gorm:"type:text;not null;size:1000" json:"description"`
-	OrganiserID  string         `gorm:"index;size:30;not null" json:"organiser_id"`
-	Members      []GroupMember  `gorm:"foreignKey:GroupID" json:"members"`
-	CreatedAt    time.Time      `gorm:"not null" json:"created_at"`
-	UpdatedAt    time.Time      `gorm:"not null" json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ID           string        `gorm:"primaryKey;size:50;not null" json:"id"`
+	Name         string        `gorm:"index;size:100;not null" json:"name"`
+	DateTime     time.Time     `gorm:"index;not null" json:"date_time"`
+	Venue        Venue         `gorm:"type:jsonb;not null" json:"venue"`
+	Cost         float64       `gorm:"type:decimal(10,2);not null;default:0.0" json:"cost"`
+	SkillLevel   SkillLevel    `gorm:"type:varchar(20);index;not null;default:'beginner'" json:"skill_level"`
+	ActivityType ActivityType  `gorm:"type:varchar(20);index;not null" json:"activity_type"`
+	MaxMembers   int           `gorm:"type:integer;not null;default:10" json:"max_members"`
+	Description  string        `gorm:"type:text;not null;size:1000" json:"description"`
+	OrganiserID  string        `gorm:"index;size:30;not null" json:"organiser_id"`
+	Members      []GroupMember `gorm:"foreignKey:GroupID" json:"members"`
+	CreatedAt    time.Time     `gorm:"not null" json:"created_at"`
+	UpdatedAt    time.Time     `gorm:"not null" json:"updated_at"`
 }
 
 // BeforeCreate hook is called before creating a new group
@@ -98,16 +97,6 @@ func (g *Group) BeforeCreate(tx *gorm.DB) error {
 func (g *Group) BeforeSave(tx *gorm.DB) error {
 	g.UpdatedAt = time.Now()
 	return nil
-}
-
-// TableName specifies the table name for the Group model
-func (Group) TableName() string {
-	return "group"
-}
-
-// TableName specifies the table name for the GroupMember model
-func (GroupMember) TableName() string {
-	return "group_member"
 }
 
 // BeforeCreate hook is called before creating a new group member

@@ -243,4 +243,3 @@ GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order
 ---
 
 If you have any questions or want to contribute, please open an issue or pull request!
-
