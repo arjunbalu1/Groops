@@ -34,7 +34,7 @@ func GenerateRandomString(length int) (string, error) {
 }
 
 // CreateSession creates a new session for the user
-func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo) error {
+func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo, username ...string) error { //username ...string incase username is not found
 	// Generate a random session ID
 	sessionID, err := GenerateRandomString(SessionIDLength)
 	if err != nil {
@@ -45,11 +45,15 @@ func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo) erro
 	session := models.Session{
 		ID:           sessionID,
 		UserID:       userInfo.Sub,
+		Username:     "",
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		TokenExpiry:  token.Expiry,
 		CreatedAt:    time.Now(),
 		ExpiresAt:    time.Now().Add(time.Hour * 24 * 30), // 30 days
+	}
+	if len(username) > 0 {
+		session.Username = username[0]
 	}
 
 	// Store the session in the database

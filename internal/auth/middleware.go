@@ -81,8 +81,8 @@ func HandleGoogleCallback(c *gin.Context) {
 	// Check if user already exists
 	var existingAccount models.Account
 	if err := database.GetDB().Where("google_id = ?", userInfo.Sub).First(&existingAccount).Error; err == nil {
-		// User exists, create session
-		if err := CreateSession(c, token, userInfo); err != nil {
+		// User exists, create session with username
+		if err := CreateSession(c, token, userInfo, existingAccount.Username); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			c.Abort()
 			return

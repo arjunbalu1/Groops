@@ -25,4 +25,16 @@ go.work
 
 # OS specific files
 .DS_Store
+<<<<<<< HEAD
 Thumbs.db 
+=======
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+!.env.example 
+API_DEMO_GUIDE.md
+TODO.txt
+OAUTH.md
+>>>>>>> 3d4874a (refined Oauth)
