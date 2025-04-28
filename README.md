@@ -7,12 +7,12 @@ A group management platform where people can host and join activity-based groups
 - [Features](#features)
 - [Technologies Used](#technologies-used)
 - [Setup Instructions](#setup-instructions)
+- [Authentication & Session Flow](#authentication--session-flow)
 - [API Endpoints](#api-endpoints)
 - [Data Models](#data-models)
-- [Security Implementation](#security-implementation)
-- [Data Validation](#data-validation)
-- [Error Handling](#error-handling)
-- [Performance Optimizations](#performance-optimizations)
+- [Database Reset](#database-reset)
+- [Postman & API Demo Guide](#postman--api-demo-guide)
+- [Troubleshooting](#troubleshooting)
 - [Environment Variables](#environment-variables)
 - [Development Notes](#development-notes)
 
@@ -20,13 +20,13 @@ A group management platform where people can host and join activity-based groups
 
 ## Features
 
-- **User Authentication**: Secure registration and login with JWT tokens (HttpOnly cookies)
+- **Google OAuth Authentication**: Secure login with Google, no passwords required
 - **Profile Management**: Users can update their bio and avatar
 - **Group Creation & Management**: Create, join, leave, and manage groups for different activities
 - **Filtering, Sorting, Pagination**: Find groups by activity, skill, price, date, and more
 - **Activity Tracking**: Track user participation and group activity
 - **Location-Based Features**: Store and search for groups by venue
-- **Enhanced Security**: Password strength enforcement, secure cookies, and input validation
+- **Enhanced Security**: Secure cookies, input validation, and CSRF protection
 
 ---
 
@@ -36,7 +36,7 @@ A group management platform where people can host and join activity-based groups
 - Gin Web Framework
 - GORM ORM
 - PostgreSQL
-- JWT Authentication
+- Google OAuth2
 - RESTful API design
 
 ---
@@ -63,15 +63,27 @@ A group management platform where people can host and join activity-based groups
     ```
 
 3. Set up the PostgreSQL database:
-    ```sh
-    createdb -U postgres groops
-    ```
+    - **Option 1: Terminal**
+      ```sh
+      createdb -U postgres groops
+      ```
+    - **Option 2: pgAdmin**
+      - Open pgAdmin, right-click "Databases" → Create → Database, name it `groops`.
 
 4. Run the server:
     ```sh
     go run cmd/server/main.go
     ```
     The server will start on the port specified in your `.env` file (defaults to 8080).
+
+---
+
+## Authentication & Session Flow
+
+- **Login:** Users authenticate via Google OAuth (`/auth/login`).
+- **Profile Creation:** On first login, users are prompted to create a profile (choose a username, set bio/avatar).
+- **Session:** After profile creation, all requests are authenticated via a secure session cookie (`groops_session`).
+- **Re-login:** If your session expires, logging in again with Google will automatically link your session to your existing profile (by Google ID).
 
 ---
 
@@ -82,22 +94,26 @@ A group management platform where people can host and join activity-based groups
 - `GET /` — Welcome message
 
 ### Authentication
-- `POST /accounts` — Create a new account
-- `POST /auth/login` — Login with username and password
-- `POST /auth/refresh` — Refresh access token using refresh token
+- `GET /auth/login` — Start Google OAuth login
+- `GET /auth/logout` — Logout and clear session
 
 ### Account/Profile
 - `GET /api/accounts/:username` — Get account details
 - `PUT /api/accounts/:username` — Update your profile (bio, avatar)
+- `POST /api/profile/register` — Register your profile after OAuth login
 
 ### Groups
-- `POST /api/groups` — Create a new group
+- `POST /api/groups` — Create a new group (no organizer_username in payload; backend uses your session)
 - `GET /api/groups` — List groups (supports filtering, sorting, pagination)
 - `POST /api/groups/:group_id/join` — Request to join a group
 - `POST /api/groups/:group_id/leave` — Leave a group
 - `GET /api/groups/:group_id/pending-members` — List pending join requests (organiser only)
 - `POST /api/groups/:group_id/members/:username/approve` — Approve join request
 - `POST /api/groups/:group_id/members/:username/reject` — Reject join request
+
+### Notifications
+- `GET /api/notifications` — List notifications
+- `GET /api/notifications/unread-count` — Get unread notification count
 
 ---
 
@@ -131,10 +147,12 @@ GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order
 
 ## Data Models
 
+(See `internal/models/` for full struct definitions)
+
 ### Account
 - `Username` (Primary Key)
 - `Email`
-- `HashedPass`
+- `GoogleID`
 - `DateJoined`
 - `Rating`
 - `Bio`
@@ -145,7 +163,6 @@ GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order
 - `LastLogin`
 - `CreatedAt`
 - `UpdatedAt`
-- `DeletedAt`
 
 ### Group
 - `ID` (Primary Key)
@@ -161,7 +178,6 @@ GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order
 - `Members` (GroupMember)
 - `CreatedAt`
 - `UpdatedAt`
-- `DeletedAt`
 
 ### GroupMember
 - `GroupID` (Primary Key, Foreign Key)
@@ -179,48 +195,37 @@ GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order
 
 ---
 
-## Security Implementation
+## Database Reset
 
-- **JWT Authentication**: Secure authentication using JWT tokens in HttpOnly cookies
-- **SameSite=Strict**: Cookies protected against CSRF
-- **Secure Flag**: Cookies sent only over HTTPS
-- **Path Restriction**: Access tokens limited to API routes, refresh tokens to auth endpoint
-- **Password Requirements**: Minimum 8 characters, at least one letter and one number
-- **Error Handling**: Consistent, user-friendly error messages
-- **Input Validation**: Comprehensive validation for all user inputs
+**To reset your database (development):**
 
----
+- **Terminal:**
+  ```sh
+  psql -U postgres -h localhost -c "DROP DATABASE IF EXISTS groops;"
+  psql -U postgres -h localhost -c "CREATE DATABASE groops;"
+  ```
+- **pgAdmin:**
+  - Right-click the `groops` database → Delete/Drop
+  - Right-click "Databases" → Create → Database, name it `groops`
 
-## Data Validation
-
-- **Group Creation**:
-  - Future date validation for events
-  - Cost can be zero or more
-  - Description length limits
-  - Activity type and skill level validation
-
-- **User Registration**:
-  - Username format (alphanumeric, 3-30 chars)
-  - Email format
-  - Password strength
-  - Duplicate username/email detection
+After resetting, restart your Go server to re-run migrations and recreate all tables.
 
 ---
 
-## Error Handling
+## Postman & API Demo Guide
 
-- Centralized error handling with clear messages
-- Logs detailed error information for debugging
-- Handles common error types (not found, validation, etc.)
-- Returns appropriate HTTP status codes
+- See `API_DEMO_GUIDE.md` for a step-by-step guide to using all endpoints with Postman, including authentication and session cookie handling.
+- All authenticated requests require the `groops_session` cookie (see the guide for details).
 
 ---
 
-## Performance Optimizations
+## Troubleshooting
 
-- **Database Indexes**: On frequently queried fields
-- **Reliable Activity Logging**: Retry logic for activity logs
-- **GORM Optimizations**: Prepared statement caching, connection pooling
+- **Database errors:** Ensure your database exists and credentials in `.env` are correct.
+- **Migrations:** If tables are missing, reset the DB and restart the server.
+- **Session/cookie issues:** If you get `authentication required`, repeat the OAuth login and use the new session cookie.
+- **Group creation:** Do not include `organizer_username` in the payload; the backend uses your session.
+- **Stale dependencies:** Run `go get -u ./...` and `go mod tidy` to update dependencies.
 
 ---
 
@@ -228,17 +233,16 @@ GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order
 
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`: Database config
 - `PORT`: Server port (default 8080)
-- `JWT_SECRET`: Secret key for JWT tokens
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL`: Google OAuth config
 - `APP_ENV`: Application environment (development/production)
 
 ---
 
 ## Development Notes
 
-- Passwords hashed with bcrypt
-- Strict environment variable validation at startup
-- Redis can be added for caching or real-time features (not required for MVP)
-- See `sketch.pdf` for UI/UX ideas
+- Passwords are not used; all authentication is via Google OAuth.
+- Strict environment variable validation at startup.
+- See `sketch.pdf` for UI/UX ideas.
 
 ---
 

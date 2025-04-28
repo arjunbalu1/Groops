@@ -30,20 +30,23 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
+	// Get the authenticated username from context
+	organizerUsername := c.GetString("username")
+	if organizerUsername == "" {
+		handleError(c, http.StatusUnauthorized, "Not authenticated", nil)
+		return
+	}
+
 	db := database.GetDB()
 
 	// Find the organizer account
 	var organizer models.Account
-	if err := db.Where("username = ?", request.OrganizerUsername).First(&organizer).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			handleError(c, http.StatusNotFound, "Organizer not found", err)
-			return
-		}
-		handleError(c, http.StatusInternalServerError, "Unable to verify organizer", err)
+	if err := db.Where("username = ?", organizerUsername).First(&organizer).Error; err != nil {
+		handleError(c, http.StatusNotFound, "Organizer not found", err)
 		return
 	}
 
-	// Create the group
+	// Create the group (use organizerUsername, not request.OrganizerUsername)
 	group := models.Group{
 		Name:         request.Name,
 		DateTime:     request.DateTime,
@@ -53,7 +56,7 @@ func CreateGroup(c *gin.Context) {
 		ActivityType: models.ActivityType(request.ActivityType),
 		MaxMembers:   request.MaxMembers,
 		Description:  request.Description,
-		OrganiserID:  organizer.Username,
+		OrganiserID:  organizerUsername,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -66,7 +69,7 @@ func CreateGroup(c *gin.Context) {
 	// Create the first group member (organizer)
 	member := models.GroupMember{
 		GroupID:   group.ID,
-		Username:  organizer.Username,
+		Username:  organizerUsername,
 		Status:    "approved",
 		JoinedAt:  time.Now(),
 		UpdatedAt: time.Now(),
@@ -78,7 +81,7 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	// Log the activity
-	if err := LogActivity(organizer.Username, "create_group", group.ID); err != nil {
+	if err := LogActivity(organizerUsername, "create_group", group.ID); err != nil {
 		// Log but don't fail the request
 		log.Printf("Warning: Failed to log activity: %v", err)
 	}
@@ -210,13 +213,32 @@ func JoinGroup(c *gin.Context) {
 	// Check if user is already a member
 	var member models.GroupMember
 	if err := db.Where("group_id = ? AND username = ?", groupID, username).First(&member).Error; err == nil {
-		if member.Status == "approved" {
+		switch member.Status {
+		case "approved":
 			handleError(c, http.StatusConflict, "Already a member", nil)
 			return
-		} else if member.Status == "pending" {
+		case "pending":
 			handleError(c, http.StatusConflict, "Join request already pending", nil)
 			return
+		case "rejected":
+			// Update status to pending and update timestamps
+			member.Status = "pending"
+			member.UpdatedAt = time.Now()
+			member.JoinedAt = time.Now()
+			if err := db.Save(&member).Error; err != nil {
+				handleError(c, http.StatusInternalServerError, "Failed to re-request to join group", err)
+				return
+			}
+			// Log activity, notify organiser, etc.
+			_ = LogActivity(username, "join_group_request", groupID)
+			msg := username + " requested to join your group '" + group.Name + "'"
+			_ = createNotification(db, group.OrganiserID, "join_request", msg, groupID)
+			c.JSON(http.StatusCreated, gin.H{"message": "Join request re-submitted"})
+			return
 		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		handleError(c, http.StatusInternalServerError, "Failed to check group membership", err)
+		return
 	}
 
 	// Check if group is full (approved members)
@@ -227,7 +249,7 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	// Create join request (pending status)
+	// If not a member, create join request (pending status)
 	newMember := models.GroupMember{
 		GroupID:   groupID,
 		Username:  username,
@@ -240,10 +262,8 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	// Log activity
+	// Log activity, notify organiser, etc.
 	_ = LogActivity(username, "join_group_request", groupID)
-
-	// Notify organiser
 	msg := username + " requested to join your group '" + group.Name + "'"
 	_ = createNotification(db, group.OrganiserID, "join_request", msg, groupID)
 

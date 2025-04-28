@@ -31,3 +31,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example 
+API_DEMO_GUIDE.md
+TODO.txt
+OAUTH.md

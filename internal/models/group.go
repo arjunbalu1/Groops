@@ -119,13 +119,12 @@ func (gm *GroupMember) BeforeSave(tx *gorm.DB) error {
 
 // CreateGroupRequest represents the data needed to create a new group
 type CreateGroupRequest struct {
-	Name              string       `json:"name" binding:"required"`
-	DateTime          time.Time    `json:"date_time" binding:"required"`
-	Venue             Venue        `json:"venue" binding:"required"`
-	Cost              float64      `json:"cost"`
-	SkillLevel        SkillLevel   `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
-	ActivityType      ActivityType `json:"activity_type" binding:"required,oneof=sport social games other"`
-	MaxMembers        int          `json:"max_members" binding:"required,min=2"`
-	Description       string       `json:"description" binding:"required,max=1000"`
-	OrganizerUsername string       `json:"organizer_username" binding:"required"`
+	Name         string       `json:"name" binding:"required"`
+	DateTime     time.Time    `json:"date_time" binding:"required"`
+	Venue        Venue        `json:"venue" binding:"required"`
+	Cost         float64      `json:"cost"`
+	SkillLevel   SkillLevel   `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
+	ActivityType ActivityType `json:"activity_type" binding:"required,oneof=sport social games other"`
+	MaxMembers   int          `json:"max_members" binding:"required,min=2"`
+	Description  string       `json:"description" binding:"required,max=1000"`
 }
