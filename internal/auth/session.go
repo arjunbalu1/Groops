@@ -63,7 +63,7 @@ func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo) erro
 	c.SetCookie(
 		SessionCookieName,
 		sessionID,
-		int(session.ExpiresAt.Sub(time.Now()).Seconds()),
+		int(time.Until(session.ExpiresAt).Seconds()),
 		"/",
 		"",
 		secure,
