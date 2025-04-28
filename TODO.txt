@@ -1,0 +1,21 @@
+# Groops TODO List
+
+## Security Improvements
+- ✅ Replace hardcoded `oauthStateString = "random-state-string"` with a secure random string generated per session
+  - ✅ Implement proper CSRF protection for OAuth flow
+  - ✅ Store state in a cookie
+  - ✅ Verify state parameter in callback to prevent CSRF attacks
+
+## Features to Implement
+- Group Management: Add endpoints for updating or deleting groups
+- Search Functionality: Implement user search
+- Rating System: Complete implementation for user ratings
+- File Upload: Direct avatar/image uploading functionality
+- Admin Features: Admin-specific endpoints or roles
+- Testing: Add comprehensive test suite
+- Advanced Filtering: Location-based search implementation
+- Group Categories/Tags: Add tagging system beyond ActivityType
+- Real-time Notifications: Consider WebSockets implementation
+- Comments/Discussions: Add group discussion features
+- Payment Integration: Implement for paid groups
+- User Blocking/Reporting: Add safety features 
