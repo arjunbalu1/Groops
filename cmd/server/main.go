@@ -28,7 +28,9 @@ func main() {
 	}
 
 	// Initialize database
-	database.InitDB()
+	if err := database.InitDB(); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
 
 	// Initialize Gin router
 	router := gin.Default()
