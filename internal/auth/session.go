@@ -41,23 +41,24 @@ func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo, user
 		return fmt.Errorf("failed to generate session ID: %w", err)
 	}
 
-	// Create a new session
+	// Get database connection
+	db := database.GetDB()
+
+	// Create a new session (without refresh token)
 	session := models.Session{
-		ID:           sessionID,
-		UserID:       userInfo.Sub,
-		Username:     "",
-		AccessToken:  token.AccessToken,
-		RefreshToken: token.RefreshToken,
-		TokenExpiry:  token.Expiry,
-		CreatedAt:    time.Now(),
-		ExpiresAt:    time.Now().Add(time.Hour * 24 * 30), // 30 days
+		ID:          sessionID,
+		UserID:      userInfo.Sub,
+		Username:    "",
+		AccessToken: token.AccessToken,
+		TokenExpiry: token.Expiry,
+		CreatedAt:   time.Now(),
+		ExpiresAt:   time.Now().Add(models.SessionDuration),
 	}
 	if len(username) > 0 {
 		session.Username = username[0]
 	}
 
 	// Store the session in the database
-	db := database.GetDB()
 	if err := db.Create(&session).Error; err != nil {
 		return fmt.Errorf("failed to store session: %w", err)
 	}
@@ -111,9 +112,22 @@ func RefreshSessionToken(c *gin.Context, session *models.Session) error {
 		return nil
 	}
 
+	// Get database connection
+	db := database.GetDB()
+
+	// Get the refresh token from the account
+	refreshToken, _, err := GetRefreshTokenFromAccount(db, session.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to get refresh token: %w", err)
+	}
+
+	if refreshToken == "" {
+		return fmt.Errorf("no refresh token available")
+	}
+
 	// Create a token source with the refresh token
 	token := &oauth2.Token{
-		RefreshToken: session.RefreshToken,
+		RefreshToken: refreshToken,
 	}
 
 	// Use the token source to get a new token
@@ -122,16 +136,18 @@ func RefreshSessionToken(c *gin.Context, session *models.Session) error {
 		return fmt.Errorf("failed to refresh token: %w", err)
 	}
 
-	// Update the session with the new token
-	db := database.GetDB()
+	// Update the account with the new refresh token if provided
+	if newToken.RefreshToken != "" {
+		if err := UpdateAccountToken(db, session.UserID, newToken); err != nil {
+			// Non-fatal, log but continue
+			fmt.Printf("Warning: Failed to update account token: %v\n", err)
+		}
+	}
+
+	// Update the session with the new access token
 	updates := map[string]interface{}{
 		"access_token": newToken.AccessToken,
 		"token_expiry": newToken.Expiry,
-	}
-
-	// If we got a new refresh token, update that too
-	if newToken.RefreshToken != "" {
-		updates["refresh_token"] = newToken.RefreshToken
 	}
 
 	if err := db.Model(&session).Updates(updates).Error; err != nil {

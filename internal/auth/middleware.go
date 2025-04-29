@@ -8,6 +8,7 @@ import (
 	"groops/internal/models"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -48,7 +49,12 @@ func GetLoginURL(c *gin.Context) (string, error) {
 	}
 
 	// Generate the authorization URL with the state parameter
-	return googleOAuthConfig.AuthCodeURL(state), nil
+	// Use AccessTypeOffline to get a refresh token
+	// Set the prompt parameter to avoid asking for consent every time
+	return googleOAuthConfig.AuthCodeURL(state,
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("prompt", "select_account"),
+	), nil
 }
 
 // HandleGoogleCallback processes the OAuth callback from Google
@@ -80,8 +86,17 @@ func HandleGoogleCallback(c *gin.Context) {
 
 	// Check if user already exists
 	var existingAccount models.Account
-	if err := database.GetDB().Where("google_id = ?", userInfo.Sub).First(&existingAccount).Error; err == nil {
-		// User exists, create session with username
+	db := database.GetDB()
+	if err := db.Where("google_id = ?", userInfo.Sub).First(&existingAccount).Error; err == nil {
+		// User exists, update token in account
+		if token.RefreshToken != "" {
+			if err := SaveRefreshTokenToAccount(db, userInfo.Sub, token); err != nil {
+				// Log error but continue
+				fmt.Printf("Warning: Failed to save refresh token: %v\n", err)
+			}
+		}
+
+		// Create session with username
 		if err := CreateSession(c, token, userInfo, existingAccount.Username); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			c.Abort()
@@ -93,7 +108,41 @@ func HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// User does not exist, create session without username
+	// User does not exist
+	// We still need to save refresh token for new users
+	if token.RefreshToken != "" {
+		// Generate a temporary random username
+		randomID, err := GenerateRandomString(8)
+		if err != nil {
+			fmt.Printf("Warning: Failed to generate temporary username: %v\n", err)
+			randomID = fmt.Sprintf("%d", time.Now().UnixNano())
+		}
+		tempUsername := fmt.Sprintf("temp-%s", randomID)
+
+		// Create a temporary account record just to store the token
+		tempAccount := models.Account{
+			GoogleID:   userInfo.Sub,
+			Username:   tempUsername,
+			Email:      userInfo.Email,
+			DateJoined: time.Now(),
+			LastLogin:  time.Now(),
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+			Rating:     5.0,
+		}
+
+		// Create the account first
+		if err := db.Create(&tempAccount).Error; err != nil {
+			fmt.Printf("Warning: Failed to create temporary account: %v\n", err)
+		} else {
+			// Then save the refresh token
+			if err := SaveRefreshTokenToAccount(db, userInfo.Sub, token); err != nil {
+				fmt.Printf("Warning: Failed to save refresh token for new user: %v\n", err)
+			}
+		}
+	}
+
+	// Create session without username
 	if err := CreateSession(c, token, userInfo); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 		c.Abort()

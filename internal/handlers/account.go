@@ -12,6 +12,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )
 
@@ -64,20 +65,68 @@ func CreateProfile(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	// Check for existing profile by GoogleID or username
-	var existing models.Account
-	if err := db.Where("google_id = ? OR username = ?", sub, req.Username).First(&existing).Error; err == nil {
-		handleError(c, http.StatusConflict, "Profile already exists for this user or username taken", nil)
+
+	// Check if username is already taken by someone else
+	var existingUsername models.Account
+	if err := db.Where("username = ? AND google_id != ?", req.Username, sub).First(&existingUsername).Error; err == nil {
+		handleError(c, http.StatusConflict, "Username already taken", nil)
 		return
 	}
 
-	// If no avatar URL is provided, use the Google profile picture
+	// Check if we have a temporary account for this Google ID
+	var tempAccount models.Account
+	accountExists := false
+	isTemp := false
+
+	if err := db.Where("google_id = ?", sub).First(&tempAccount).Error; err == nil {
+		accountExists = true
+		isTemp = tempAccount.Username[:5] == "temp-" // Check if it's a temporary account
+	}
+
+	// If avatar URL is not provided, use Google profile picture
 	avatarURL := req.AvatarURL
 	if avatarURL == "" {
 		avatarURL = picture
 	}
 
 	now := time.Now()
+
+	if accountExists && isTemp {
+		// Update the temporary account with the chosen username and other details
+		updates := map[string]interface{}{
+			"username":   req.Username,
+			"bio":        req.Bio,
+			"avatar_url": avatarURL,
+			"updated_at": now,
+		}
+
+		if err := db.Model(&tempAccount).Updates(updates).Error; err != nil {
+			handleError(c, http.StatusInternalServerError, "Failed to update account", err)
+			return
+		}
+
+		// Retrieve the updated account
+		if err := db.Where("google_id = ?", sub).First(&tempAccount).Error; err != nil {
+			handleError(c, http.StatusInternalServerError, "Failed to retrieve updated account", err)
+			return
+		}
+
+		// Link the session to the user
+		if err := auth.LinkSessionToUser(sessionID, req.Username); err != nil {
+			// Non-fatal error - log but don't fail the request
+			log.Printf("Warning: Failed to link session to user: %v", err)
+		}
+
+		c.JSON(http.StatusCreated, tempAccount)
+		return
+	} else if accountExists && !isTemp {
+		// Account exists but is not temporary - this is a conflict
+		handleError(c, http.StatusConflict, "Profile already exists for this user", nil)
+		return
+	}
+
+	// If we get here, we need to create a new account (should rarely happen
+	// since we create temp accounts during OAuth)
 	account := models.Account{
 		GoogleID:   sub,
 		Username:   req.Username,
@@ -100,6 +149,28 @@ func CreateProfile(c *gin.Context) {
 	if err := auth.LinkSessionToUser(sessionID, req.Username); err != nil {
 		// Non-fatal error - log but don't fail the request
 		log.Printf("Warning: Failed to link session to user: %v", err)
+	}
+
+	// Get session and check for refresh token
+	var session models.Session
+	if err := db.Where("id = ?", sessionID).First(&session).Error; err == nil {
+		// Get user's session
+		// Retrieve active token from database and save it to the account if it exists
+		userSession, err := auth.GetSession(c)
+		if err == nil && userSession.AccessToken != "" {
+			// Create a token object to pass to SaveRefreshTokenToAccount
+			token := &oauth2.Token{
+				AccessToken: userSession.AccessToken,
+				TokenType:   "Bearer",
+				Expiry:      userSession.TokenExpiry,
+			}
+
+			// Try to save the token to the account
+			if err := auth.SaveRefreshTokenToAccount(db, sub, token); err != nil {
+				// Non-fatal, just log it
+				log.Printf("Warning: Failed to save token to account: %v", err)
+			}
+		}
 	}
 
 	c.JSON(http.StatusCreated, account)
