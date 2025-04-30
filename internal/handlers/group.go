@@ -19,21 +19,23 @@ func CreateGroup(c *gin.Context) {
 	var request models.CreateGroupRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		handleError(c, http.StatusBadRequest, fmt.Sprintf("Invalid input: %s", err.Error()), err)
+		log.Printf("Error: Invalid input: %s", err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid input: %s", err.Error())})
 		return
 	}
 
 	// Validate that DateTime is in the future
 	if request.DateTime.Before(time.Now()) {
-		handleError(c, http.StatusBadRequest, "Event date must be in the future",
-			fmt.Errorf("event date %v is before current time", request.DateTime))
+		log.Printf("Error: Event date %v is before current time", request.DateTime)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Event date must be in the future"})
 		return
 	}
 
 	// Get the authenticated username from context
 	organizerUsername := c.GetString("username")
 	if organizerUsername == "" {
-		handleError(c, http.StatusUnauthorized, "Not authenticated", nil)
+		log.Printf("Error: Not authenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
 
@@ -42,7 +44,8 @@ func CreateGroup(c *gin.Context) {
 	// Find the organizer account
 	var organizer models.Account
 	if err := db.Where("username = ?", organizerUsername).First(&organizer).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Organizer not found", err)
+		log.Printf("Error: Organizer not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Organizer not found"})
 		return
 	}
 
@@ -62,7 +65,8 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	if err := db.Create(&group).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to create group", err)
+		log.Printf("Error: Failed to create group: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group"})
 		return
 	}
 
@@ -76,13 +80,13 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	if err := db.Create(&member).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to add organizer as member", err)
+		log.Printf("Error: Failed to add organizer as member: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add organizer as member"})
 		return
 	}
 
 	// Log the activity
 	if err := LogActivity(organizerUsername, "create_group", group.ID); err != nil {
-		// Log but don't fail the request
 		log.Printf("Warning: Failed to log activity: %v", err)
 	}
 
@@ -150,14 +154,15 @@ func GetGroups(c *gin.Context) {
 	query = query.Limit(limit).Offset(offset)
 
 	if err := query.Find(&groups).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to fetch groups", err)
+		log.Printf("Error: Failed to fetch groups: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch groups"})
 		return
 	}
 
 	c.JSON(http.StatusOK, groups)
 }
 
-// LogActivity adds a new activity to user's history with retry logic
+// LogActivity adds a new activity to user's history
 func LogActivity(username string, eventType string, groupID string) error {
 	activity := models.ActivityLog{
 		Username:  username,
@@ -167,20 +172,11 @@ func LogActivity(username string, eventType string, groupID string) error {
 	}
 
 	db := database.GetDB()
-
-	// Try up to 3 times
-	var err error
-	for attempts := 0; attempts < 3; attempts++ {
-		if err = db.Create(&activity).Error; err != nil {
-			log.Printf("Failed to log activity (attempt %d/3): %v", attempts+1, err)
-			time.Sleep(time.Second * time.Duration(attempts+1)) // Backoff
-			continue
-		}
-		return nil
+	err := db.Create(&activity).Error
+	if err != nil {
+		log.Printf("Warning: Failed to log activity: %v", err)
 	}
-
-	// If we got here, all attempts failed
-	return fmt.Errorf("failed to log activity after 3 attempts: %v", err)
+	return err
 }
 
 // Helper to create a notification
@@ -206,7 +202,8 @@ func JoinGroup(c *gin.Context) {
 	// Check if group exists
 	var group models.Group
 	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Group not found", err)
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
 		return
 	}
 
@@ -215,10 +212,12 @@ func JoinGroup(c *gin.Context) {
 	if err := db.Where("group_id = ? AND username = ?", groupID, username).First(&member).Error; err == nil {
 		switch member.Status {
 		case "approved":
-			handleError(c, http.StatusConflict, "Already a member", nil)
+			log.Printf("Error: Already a member")
+			c.JSON(http.StatusConflict, gin.H{"error": "Already a member"})
 			return
 		case "pending":
-			handleError(c, http.StatusConflict, "Join request already pending", nil)
+			log.Printf("Error: Join request already pending")
+			c.JSON(http.StatusConflict, gin.H{"error": "Join request already pending"})
 			return
 		case "rejected":
 			// Update status to pending and update timestamps
@@ -226,18 +225,24 @@ func JoinGroup(c *gin.Context) {
 			member.UpdatedAt = time.Now()
 			member.JoinedAt = time.Now()
 			if err := db.Save(&member).Error; err != nil {
-				handleError(c, http.StatusInternalServerError, "Failed to re-request to join group", err)
+				log.Printf("Error: Failed to re-request to join group: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to re-request to join group"})
 				return
 			}
 			// Log activity, notify organiser, etc.
-			_ = LogActivity(username, "join_group_request", groupID)
+			if err := LogActivity(username, "join_group_request", groupID); err != nil {
+				log.Printf("Warning: Failed to log join request activity: %v", err)
+			}
 			msg := username + " requested to join your group '" + group.Name + "'"
-			_ = createNotification(db, group.OrganiserID, "join_request", msg, groupID)
+			if err := createNotification(db, group.OrganiserID, "join_request", msg, groupID); err != nil {
+				log.Printf("Warning: Failed to create notification: %v", err)
+			}
 			c.JSON(http.StatusCreated, gin.H{"message": "Join request re-submitted"})
 			return
 		}
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		handleError(c, http.StatusInternalServerError, "Failed to check group membership", err)
+		log.Printf("Error: Failed to check group membership: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check group membership"})
 		return
 	}
 
@@ -245,7 +250,8 @@ func JoinGroup(c *gin.Context) {
 	var approvedCount int64
 	db.Model(&models.GroupMember{}).Where("group_id = ? AND status = ?", groupID, "approved").Count(&approvedCount)
 	if int(approvedCount) >= group.MaxMembers {
-		handleError(c, http.StatusForbidden, "Group is full", nil)
+		log.Printf("Error: Group is full")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Group is full"})
 		return
 	}
 
@@ -258,14 +264,19 @@ func JoinGroup(c *gin.Context) {
 		UpdatedAt: time.Now(),
 	}
 	if err := db.Create(&newMember).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to request to join group", err)
+		log.Printf("Error: Failed to request to join group: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to request to join group"})
 		return
 	}
 
 	// Log activity, notify organiser, etc.
-	_ = LogActivity(username, "join_group_request", groupID)
+	if err := LogActivity(username, "join_group_request", groupID); err != nil {
+		log.Printf("Warning: Failed to log join request activity: %v", err)
+	}
 	msg := username + " requested to join your group '" + group.Name + "'"
-	_ = createNotification(db, group.OrganiserID, "join_request", msg, groupID)
+	if err := createNotification(db, group.OrganiserID, "join_request", msg, groupID); err != nil {
+		log.Printf("Warning: Failed to create notification: %v", err)
+	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Join request submitted"})
 }
@@ -280,41 +291,50 @@ func LeaveGroup(c *gin.Context) {
 	// Check if group exists
 	var group models.Group
 	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Group not found", err)
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
 		return
 	}
 
 	// Prevent organizer from leaving their own group
 	if group.OrganiserID == username {
-		handleError(c, http.StatusForbidden, "Organizer cannot leave their own group", nil)
+		log.Printf("Error: Organizer cannot leave their own group")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Organizer cannot leave their own group"})
 		return
 	}
 
 	// Check if user is a member
 	var member models.GroupMember
 	if err := db.Where("group_id = ? AND username = ?", groupID, username).First(&member).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Not a group member", err)
+		log.Printf("Error: Not a group member: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not a group member"})
 		return
 	}
 
 	// Only allow approved or pending members to leave
 	if member.Status != "approved" && member.Status != "pending" {
-		handleError(c, http.StatusForbidden, "Cannot leave group with current status", nil)
+		log.Printf("Error: Cannot leave group with current status")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot leave group with current status"})
 		return
 	}
 
 	// Remove membership (delete row)
 	if err := db.Delete(&member).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to leave group", err)
+		log.Printf("Error: Failed to leave group: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to leave group"})
 		return
 	}
 
 	// Log activity
-	_ = LogActivity(username, "leave_group", groupID)
+	if err := LogActivity(username, "leave_group", groupID); err != nil {
+		log.Printf("Warning: Failed to log leave group activity: %v", err)
+	}
 
 	// Notify organiser
 	msg := username + " has left your group '" + group.Name + "'"
-	_ = createNotification(db, group.OrganiserID, "leave_group", msg, groupID)
+	if err := createNotification(db, group.OrganiserID, "leave_group", msg, groupID); err != nil {
+		log.Printf("Warning: Failed to create leave notification: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Left group successfully"})
 }
@@ -325,23 +345,26 @@ func ListPendingMembers(c *gin.Context) {
 	requester := c.GetString("username")
 
 	db := database.GetDB()
-
-	// Check if group exists and get organiser
 	var group models.Group
+
+	// Check if group exists
 	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Group not found", err)
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
 		return
 	}
 
-	// Only organiser can view pending members
+	// Check if requester is the organizer
 	if group.OrganiserID != requester {
-		handleError(c, http.StatusForbidden, "Only organiser can view pending members", nil)
+		log.Printf("Error: Only the organizer can view pending members")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can view pending members"})
 		return
 	}
 
 	var pendingMembers []models.GroupMember
 	if err := db.Where("group_id = ? AND status = ?", groupID, "pending").Find(&pendingMembers).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to fetch pending members", err)
+		log.Printf("Error: Failed to fetch pending members: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch pending members"})
 		return
 	}
 
@@ -355,22 +378,28 @@ func ApproveJoinRequest(c *gin.Context) {
 	requester := c.GetString("username")
 
 	db := database.GetDB()
-
-	// Check if group exists and get organiser
 	var group models.Group
+
+	// Check if group exists
 	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Group not found", err)
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
 		return
 	}
+
+	// Check if requester is the organizer
 	if group.OrganiserID != requester {
-		handleError(c, http.StatusForbidden, "Only organiser can approve members", nil)
+		log.Printf("Error: Only the organizer can approve members")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can approve members"})
 		return
 	}
 
 	// Find the pending member
 	var member models.GroupMember
-	if err := db.Where("group_id = ? AND username = ? AND status = ?", groupID, username, "pending").First(&member).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Pending join request not found", err)
+	if err := db.Where("group_id = ? AND username = ? AND status = ?",
+		groupID, username, "pending").First(&member).Error; err != nil {
+		log.Printf("Error: Pending join request not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pending join request not found"})
 		return
 	}
 
@@ -378,21 +407,27 @@ func ApproveJoinRequest(c *gin.Context) {
 	var approvedCount int64
 	db.Model(&models.GroupMember{}).Where("group_id = ? AND status = ?", groupID, "approved").Count(&approvedCount)
 	if int(approvedCount) >= group.MaxMembers {
-		handleError(c, http.StatusForbidden, "Group is full", nil)
+		log.Printf("Error: Group is full")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Group is full"})
 		return
 	}
 
 	// Approve the member
 	if err := db.Model(&member).Update("status", "approved").Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to approve member", err)
+		log.Printf("Error: Failed to approve member: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve member"})
 		return
 	}
 
-	_ = LogActivity(username, "join_group_approved", groupID)
+	if err := LogActivity(username, "join_group_approved", groupID); err != nil {
+		log.Printf("Warning: Failed to log approve join activity: %v", err)
+	}
 
 	// Notify user
 	msg := "Your request to join group '" + group.Name + "' was approved"
-	_ = createNotification(db, username, "join_approved", msg, groupID)
+	if err := createNotification(db, username, "join_approved", msg, groupID); err != nil {
+		log.Printf("Warning: Failed to create approval notification: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member approved"})
 }
@@ -404,36 +439,47 @@ func RejectJoinRequest(c *gin.Context) {
 	requester := c.GetString("username")
 
 	db := database.GetDB()
-
-	// Check if group exists and get organiser
 	var group models.Group
+
+	// Check if group exists
 	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Group not found", err)
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
 		return
 	}
+
+	// Check if requester is the organizer
 	if group.OrganiserID != requester {
-		handleError(c, http.StatusForbidden, "Only organiser can reject members", nil)
+		log.Printf("Error: Only the organizer can reject members")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can reject members"})
 		return
 	}
 
 	// Find the pending member
 	var member models.GroupMember
-	if err := db.Where("group_id = ? AND username = ? AND status = ?", groupID, username, "pending").First(&member).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Pending join request not found", err)
+	if err := db.Where("group_id = ? AND username = ? AND status = ?",
+		groupID, username, "pending").First(&member).Error; err != nil {
+		log.Printf("Error: Pending join request not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pending join request not found"})
 		return
 	}
 
-	// Reject the member (update status or delete row)
+	// Reject the member
 	if err := db.Model(&member).Update("status", "rejected").Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to reject member", err)
+		log.Printf("Error: Failed to reject member: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject member"})
 		return
 	}
 
-	_ = LogActivity(username, "join_group_rejected", groupID)
+	if err := LogActivity(username, "join_group_rejected", groupID); err != nil {
+		log.Printf("Warning: Failed to log reject join activity: %v", err)
+	}
 
 	// Notify user
 	msg := "Your request to join group '" + group.Name + "' was rejected"
-	_ = createNotification(db, username, "join_rejected", msg, groupID)
+	if err := createNotification(db, username, "join_rejected", msg, groupID); err != nil {
+		log.Printf("Warning: Failed to create rejection notification: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member rejected"})
 }
@@ -446,14 +492,16 @@ func GetGroupByID(c *gin.Context) {
 	var group models.Group
 	// Preload organiser and members
 	if err := db.Preload("Members").Where("id = ?", groupID).First(&group).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Group not found", err)
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
 		return
 	}
 
 	// Fetch organiser info
 	var organiser models.Account
 	if err := db.Where("username = ?", group.OrganiserID).First(&organiser).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to fetch organiser info", err)
+		log.Printf("Error: Failed to fetch organiser info: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch organiser info"})
 		return
 	}
 

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +33,7 @@ func GenerateRandomString(length int) (string, error) {
 }
 
 // CreateSession creates a new session for the user
-func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo, username ...string) error { //username ...string incase username is not found
+func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error {
 	// Generate a random session ID
 	sessionID, err := GenerateRandomString(SessionIDLength)
 	if err != nil {
@@ -44,15 +43,20 @@ func CreateSession(c *gin.Context, token *oauth2.Token, userInfo *UserInfo, user
 	// Get database connection
 	db := database.GetDB()
 
-	// Create a new session (without refresh token)
+	// Create a new session with user info
 	session := models.Session{
-		ID:          sessionID,
-		UserID:      userInfo.Sub,
-		Username:    "",
-		AccessToken: token.AccessToken,
-		TokenExpiry: token.Expiry,
-		CreatedAt:   time.Now(),
-		ExpiresAt:   time.Now().Add(models.SessionDuration),
+		ID:            sessionID,
+		UserID:        userInfo.Sub,
+		Username:      "",
+		Email:         userInfo.Email,
+		Name:          userInfo.Name,
+		Picture:       userInfo.Picture,
+		EmailVerified: userInfo.EmailVerified,
+		GivenName:     userInfo.GivenName,
+		FamilyName:    userInfo.FamilyName,
+		Locale:        userInfo.Locale,
+		CreatedAt:     time.Now(),
+		ExpiresAt:     time.Now().Add(models.SessionDuration),
 	}
 	if len(username) > 0 {
 		session.Username = username[0]
@@ -103,58 +107,6 @@ func GetSession(c *gin.Context) (*models.Session, error) {
 	}
 
 	return &session, nil
-}
-
-// RefreshSessionToken refreshes the OAuth token for the session
-func RefreshSessionToken(c *gin.Context, session *models.Session) error {
-	// Only refresh if needed
-	if !session.NeedsTokenRefresh() {
-		return nil
-	}
-
-	// Get database connection
-	db := database.GetDB()
-
-	// Get the refresh token from the account
-	refreshToken, _, err := GetRefreshTokenFromAccount(db, session.UserID)
-	if err != nil {
-		return fmt.Errorf("failed to get refresh token: %w", err)
-	}
-
-	if refreshToken == "" {
-		return fmt.Errorf("no refresh token available")
-	}
-
-	// Create a token source with the refresh token
-	token := &oauth2.Token{
-		RefreshToken: refreshToken,
-	}
-
-	// Use the token source to get a new token
-	newToken, err := googleOAuthConfig.TokenSource(c, token).Token()
-	if err != nil {
-		return fmt.Errorf("failed to refresh token: %w", err)
-	}
-
-	// Update the account with the new refresh token if provided
-	if newToken.RefreshToken != "" {
-		if err := UpdateAccountToken(db, session.UserID, newToken); err != nil {
-			// Non-fatal, log but continue
-			fmt.Printf("Warning: Failed to update account token: %v\n", err)
-		}
-	}
-
-	// Update the session with the new access token
-	updates := map[string]interface{}{
-		"access_token": newToken.AccessToken,
-		"token_expiry": newToken.Expiry,
-	}
-
-	if err := db.Model(&session).Updates(updates).Error; err != nil {
-		return fmt.Errorf("failed to update session: %w", err)
-	}
-
-	return nil
 }
 
 // DeleteSession removes the session and clears cookies

@@ -8,12 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// handleError provides a consistent way to handle and log errors
-func handleError(c *gin.Context, status int, message string, err error) {
-	log.Printf("Error: %v", err)
-	c.JSON(status, gin.H{"error": message})
-}
-
 // HomeHandler handles requests to the root path "/"
 func HomeHandler(c *gin.Context) {
 	c.String(http.StatusOK, "Welcome to Groops!")
@@ -28,7 +22,8 @@ func HealthHandler(c *gin.Context) {
 func LoginHandler(c *gin.Context) {
 	url, err := auth.GetLoginURL(c)
 	if err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to generate login URL", err)
+		log.Printf("Error: Failed to generate login URL: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate login URL"})
 		return
 	}
 	c.Redirect(http.StatusTemporaryRedirect, url)

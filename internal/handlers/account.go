@@ -12,7 +12,6 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )
 
@@ -25,10 +24,12 @@ func GetAccount(c *gin.Context) {
 	if err := db.Preload("Activities").Preload("OwnedGroups").Preload("JoinedGroups").
 		Where("username = ?", username).First(&account).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			handleError(c, http.StatusNotFound, "Account not found", err)
+			log.Printf("Error: Account not found: %v", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
 			return
 		}
-		handleError(c, http.StatusInternalServerError, "Failed to retrieve account", err)
+		log.Printf("Error: Failed to retrieve account: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve account"})
 		return
 	}
 
@@ -39,28 +40,37 @@ func GetAccount(c *gin.Context) {
 func CreateProfile(c *gin.Context) {
 	sub := c.GetString("sub")
 	email := c.GetString("email")
-	picture := c.GetString("picture") // Get Google profile picture
+	picture := c.GetString("picture")
+	name := c.GetString("name")
+	givenName := c.GetString("given_name")
+	familyName := c.GetString("family_name")
+	locale := c.GetString("locale")
+	emailVerified := c.GetBool("email_verified")
 
 	if sub == "" {
-		handleError(c, http.StatusBadRequest, "Missing Google ID in token", nil)
+		log.Printf("Error: Missing Google ID in token")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing Google ID in token"})
 		return
 	}
 
 	if email == "" {
-		handleError(c, http.StatusBadRequest, "Missing email in token", nil)
+		log.Printf("Error: Missing email in token")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing email in token"})
 		return
 	}
 
 	var req models.CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		handleError(c, http.StatusBadRequest, "Invalid input", err)
+		log.Printf("Error: Invalid input: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
 	// Get the session
 	sessionID, err := c.Cookie(auth.SessionCookieName)
 	if err != nil {
-		handleError(c, http.StatusUnauthorized, "No active session", err)
+		log.Printf("Error: No active session: %v", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No active session"})
 		return
 	}
 
@@ -69,7 +79,8 @@ func CreateProfile(c *gin.Context) {
 	// Check if username is already taken by someone else
 	var existingUsername models.Account
 	if err := db.Where("username = ? AND google_id != ?", req.Username, sub).First(&existingUsername).Error; err == nil {
-		handleError(c, http.StatusConflict, "Username already taken", nil)
+		log.Printf("Error: Username already taken")
+		c.JSON(http.StatusConflict, gin.H{"error": "Username already taken"})
 		return
 	}
 
@@ -94,20 +105,27 @@ func CreateProfile(c *gin.Context) {
 	if accountExists && isTemp {
 		// Update the temporary account with the chosen username and other details
 		updates := map[string]interface{}{
-			"username":   req.Username,
-			"bio":        req.Bio,
-			"avatar_url": avatarURL,
-			"updated_at": now,
+			"username":       req.Username,
+			"bio":            req.Bio,
+			"avatar_url":     avatarURL,
+			"updated_at":     now,
+			"full_name":      name,
+			"given_name":     givenName,
+			"family_name":    familyName,
+			"locale":         locale,
+			"email_verified": emailVerified,
 		}
 
 		if err := db.Model(&tempAccount).Updates(updates).Error; err != nil {
-			handleError(c, http.StatusInternalServerError, "Failed to update account", err)
+			log.Printf("Error: Failed to update account: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update account"})
 			return
 		}
 
 		// Retrieve the updated account
 		if err := db.Where("google_id = ?", sub).First(&tempAccount).Error; err != nil {
-			handleError(c, http.StatusInternalServerError, "Failed to retrieve updated account", err)
+			log.Printf("Error: Failed to retrieve updated account: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated account"})
 			return
 		}
 
@@ -121,27 +139,34 @@ func CreateProfile(c *gin.Context) {
 		return
 	} else if accountExists && !isTemp {
 		// Account exists but is not temporary - this is a conflict
-		handleError(c, http.StatusConflict, "Profile already exists for this user", nil)
+		log.Printf("Error: Profile already exists for this user")
+		c.JSON(http.StatusConflict, gin.H{"error": "Profile already exists for this user"})
 		return
 	}
 
 	// If we get here, we need to create a new account (should rarely happen
 	// since we create temp accounts during OAuth)
 	account := models.Account{
-		GoogleID:   sub,
-		Username:   req.Username,
-		Email:      email,
-		DateJoined: now,
-		Rating:     5.0,
-		LastLogin:  now,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-		Bio:        req.Bio,
-		AvatarURL:  avatarURL,
+		GoogleID:      sub,
+		Username:      req.Username,
+		Email:         email,
+		EmailVerified: emailVerified,
+		FullName:      name,
+		GivenName:     givenName,
+		FamilyName:    familyName,
+		Locale:        locale,
+		DateJoined:    now,
+		Rating:        5.0,
+		LastLogin:     now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		Bio:           req.Bio,
+		AvatarURL:     avatarURL,
 	}
 
 	if err := db.Create(&account).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to create profile", err)
+		log.Printf("Error: Failed to create profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create profile"})
 		return
 	}
 
@@ -149,28 +174,6 @@ func CreateProfile(c *gin.Context) {
 	if err := auth.LinkSessionToUser(sessionID, req.Username); err != nil {
 		// Non-fatal error - log but don't fail the request
 		log.Printf("Warning: Failed to link session to user: %v", err)
-	}
-
-	// Get session and check for refresh token
-	var session models.Session
-	if err := db.Where("id = ?", sessionID).First(&session).Error; err == nil {
-		// Get user's session
-		// Retrieve active token from database and save it to the account if it exists
-		userSession, err := auth.GetSession(c)
-		if err == nil && userSession.AccessToken != "" {
-			// Create a token object to pass to SaveRefreshTokenToAccount
-			token := &oauth2.Token{
-				AccessToken: userSession.AccessToken,
-				TokenType:   "Bearer",
-				Expiry:      userSession.TokenExpiry,
-			}
-
-			// Try to save the token to the account
-			if err := auth.SaveRefreshTokenToAccount(db, sub, token); err != nil {
-				// Non-fatal, just log it
-				log.Printf("Warning: Failed to save token to account: %v", err)
-			}
-		}
 	}
 
 	c.JSON(http.StatusCreated, account)
@@ -183,20 +186,23 @@ func UpdateAccount(c *gin.Context) {
 
 	// Only the user themselves can update their profile
 	if username != requester {
-		handleError(c, http.StatusForbidden, "You can only update your own profile", nil)
+		log.Printf("Error: You can only update your own profile")
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own profile"})
 		return
 	}
 
 	var req models.UpdateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		handleError(c, http.StatusBadRequest, "Invalid input", err)
+		log.Printf("Error: Invalid input: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
 	db := database.GetDB()
 	var account models.Account
 	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
-		handleError(c, http.StatusNotFound, "Account not found", err)
+		log.Printf("Error: Account not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
 		return
 	}
 
@@ -209,12 +215,14 @@ func UpdateAccount(c *gin.Context) {
 		updates["avatar_url"] = req.AvatarURL
 	}
 	if len(updates) == 0 {
-		handleError(c, http.StatusBadRequest, "No fields to update", nil)
+		log.Printf("Error: No fields to update")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
 		return
 	}
 
 	if err := db.Model(&account).Updates(updates).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to update profile", err)
+		log.Printf("Error: Failed to update profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
 
@@ -228,7 +236,8 @@ func GetAccountEventHistory(c *gin.Context) {
 
 	var activities []models.ActivityLog
 	if err := db.Where("username = ?", username).Order("timestamp DESC").Find(&activities).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to fetch event history", err)
+		log.Printf("Error: Failed to fetch event history: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch event history"})
 		return
 	}
 
@@ -255,7 +264,8 @@ func ListNotifications(c *gin.Context) {
 	query = query.Limit(limit)
 
 	if err := query.Find(&notifications).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to fetch notifications", err)
+		log.Printf("Error: Failed to fetch notifications: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
 		return
 	}
 
@@ -282,7 +292,8 @@ func GetUnreadNotificationCount(c *gin.Context) {
 
 	var count int64
 	if err := db.Model(&models.Notification{}).Where("recipient_username = ? AND read = ?", username, false).Count(&count).Error; err != nil {
-		handleError(c, http.StatusInternalServerError, "Failed to fetch unread count", err)
+		log.Printf("Error: Failed to fetch unread count: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch unread count"})
 		return
 	}
 

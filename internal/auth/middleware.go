@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
@@ -13,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/idtoken"
 )
 
 var (
@@ -33,7 +33,7 @@ func InitOAuth() error {
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  redirectURL,
-		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile", "openid"},
 		Endpoint:     google.Endpoint,
 	}
 
@@ -49,10 +49,7 @@ func GetLoginURL(c *gin.Context) (string, error) {
 	}
 
 	// Generate the authorization URL with the state parameter
-	// Use AccessTypeOffline to get a refresh token
-	// Set the prompt parameter to avoid asking for consent every time
 	return googleOAuthConfig.AuthCodeURL(state,
-		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("prompt", "select_account"),
 	), nil
 }
@@ -76,10 +73,26 @@ func HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Get user info from Google
-	userInfo, err := getUserInfo(token)
+	// Extract ID token from the token response
+	rawIDToken, ok := token.Extra("id_token").(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get id_token"})
+		c.Abort()
+		return
+	}
+
+	// Verify the ID token
+	payload, err := verifyIDToken(rawIDToken, googleOAuthConfig.ClientID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user info"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to verify id_token: %v", err)})
+		c.Abort()
+		return
+	}
+
+	// Extract user info from the verified payload
+	userInfo, err := extractUserInfoFromPayload(payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to extract user info from token"})
 		c.Abort()
 		return
 	}
@@ -88,16 +101,8 @@ func HandleGoogleCallback(c *gin.Context) {
 	var existingAccount models.Account
 	db := database.GetDB()
 	if err := db.Where("google_id = ?", userInfo.Sub).First(&existingAccount).Error; err == nil {
-		// User exists, update token in account
-		if token.RefreshToken != "" {
-			if err := SaveRefreshTokenToAccount(db, userInfo.Sub, token); err != nil {
-				// Log error but continue
-				fmt.Printf("Warning: Failed to save refresh token: %v\n", err)
-			}
-		}
-
-		// Create session with username
-		if err := CreateSession(c, token, userInfo, existingAccount.Username); err != nil {
+		// User exists, create session with username
+		if err := CreateSession(c, userInfo, existingAccount.Username); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 			c.Abort()
 			return
@@ -109,41 +114,39 @@ func HandleGoogleCallback(c *gin.Context) {
 	}
 
 	// User does not exist
-	// We still need to save refresh token for new users
-	if token.RefreshToken != "" {
-		// Generate a temporary random username
-		randomID, err := GenerateRandomString(8)
-		if err != nil {
-			fmt.Printf("Warning: Failed to generate temporary username: %v\n", err)
-			randomID = fmt.Sprintf("%d", time.Now().UnixNano())
-		}
-		tempUsername := fmt.Sprintf("temp-%s", randomID)
+	// Generate a temporary random username
+	randomID, err := GenerateRandomString(8)
+	if err != nil {
+		fmt.Printf("Warning: Failed to generate temporary username: %v\n", err)
+		randomID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	tempUsername := fmt.Sprintf("temp-%s", randomID)
 
-		// Create a temporary account record just to store the token
-		tempAccount := models.Account{
-			GoogleID:   userInfo.Sub,
-			Username:   tempUsername,
-			Email:      userInfo.Email,
-			DateJoined: time.Now(),
-			LastLogin:  time.Now(),
-			CreatedAt:  time.Now(),
-			UpdatedAt:  time.Now(),
-			Rating:     5.0,
-		}
+	// Create a temporary account record
+	tempAccount := models.Account{
+		GoogleID:      userInfo.Sub,
+		Username:      tempUsername,
+		Email:         userInfo.Email,
+		EmailVerified: userInfo.EmailVerified,
+		FullName:      userInfo.Name,
+		GivenName:     userInfo.GivenName,
+		FamilyName:    userInfo.FamilyName,
+		Locale:        userInfo.Locale,
+		DateJoined:    time.Now(),
+		LastLogin:     time.Now(),
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		Rating:        5.0,
+		AvatarURL:     userInfo.Picture,
+	}
 
-		// Create the account first
-		if err := db.Create(&tempAccount).Error; err != nil {
-			fmt.Printf("Warning: Failed to create temporary account: %v\n", err)
-		} else {
-			// Then save the refresh token
-			if err := SaveRefreshTokenToAccount(db, userInfo.Sub, token); err != nil {
-				fmt.Printf("Warning: Failed to save refresh token for new user: %v\n", err)
-			}
-		}
+	// Create the account
+	if err := db.Create(&tempAccount).Error; err != nil {
+		fmt.Printf("Warning: Failed to create temporary account: %v\n", err)
 	}
 
 	// Create session without username
-	if err := CreateSession(c, token, userInfo); err != nil {
+	if err := CreateSession(c, userInfo); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 		c.Abort()
 		return
@@ -153,28 +156,47 @@ func HandleGoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, "/create-profile")
 }
 
-// getUserInfo gets the user info from the Google API
-func getUserInfo(token *oauth2.Token) (*UserInfo, error) {
-	// Create a client that uses the token
-	client := googleOAuthConfig.Client(context.Background(), token)
-
-	// Make a request to the userinfo endpoint
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+// verifyIDToken verifies the ID token using Google's official library
+func verifyIDToken(idToken string, audience string) (*idtoken.Payload, error) {
+	// Use Google's idtoken library to verify the token
+	payload, err := idtoken.Validate(context.Background(), idToken, audience)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user info: %w", err)
+		return nil, fmt.Errorf("failed to validate ID token: %w", err)
 	}
-	defer resp.Body.Close()
-
-	// Parse the response
-	var userInfo UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return nil, fmt.Errorf("failed to parse user info: %w", err)
-	}
-
-	return &userInfo, nil
+	return payload, nil
 }
 
-// AuthMiddleware validates Google JWT tokens and refreshes them if needed
+// extractUserInfoFromPayload extracts user info from the verified token payload
+func extractUserInfoFromPayload(payload *idtoken.Payload) (*UserInfo, error) {
+	userInfo := &UserInfo{
+		Sub:   payload.Subject,
+		Email: payload.Claims["email"].(string),
+	}
+
+	// Extract other fields if they exist
+	if name, ok := payload.Claims["name"].(string); ok {
+		userInfo.Name = name
+	}
+	if picture, ok := payload.Claims["picture"].(string); ok {
+		userInfo.Picture = picture
+	}
+	if given_name, ok := payload.Claims["given_name"].(string); ok {
+		userInfo.GivenName = given_name
+	}
+	if family_name, ok := payload.Claims["family_name"].(string); ok {
+		userInfo.FamilyName = family_name
+	}
+	if locale, ok := payload.Claims["locale"].(string); ok {
+		userInfo.Locale = locale
+	}
+	if email_verified, ok := payload.Claims["email_verified"].(bool); ok {
+		userInfo.EmailVerified = email_verified
+	}
+
+	return userInfo, nil
+}
+
+// AuthMiddleware validates the session
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the session from the request
@@ -185,47 +207,23 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Refresh the token if needed
-		if session.NeedsTokenRefresh() {
-			if err := RefreshSessionToken(c, session); err != nil {
-				// Token refresh failed, force re-login
-				DeleteSession(c)
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "session expired, please log in again"})
-				c.Abort()
-				return
-			}
-		}
-
-		// Get user info from Google to verify the token is still valid
-		client := googleOAuthConfig.Client(context.Background(), &oauth2.Token{
-			AccessToken: session.AccessToken,
-			TokenType:   "Bearer",
-			Expiry:      session.TokenExpiry,
-		})
-
-		resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
-		if err != nil || resp.StatusCode != http.StatusOK {
-			// Token is invalid
+		// Verify the session hasn't expired
+		if session.IsExpired() {
 			DeleteSession(c)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token, please log in again"})
-			c.Abort()
-			return
-		}
-		defer resp.Body.Close()
-
-		// Parse user info
-		var userInfo UserInfo
-		if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user info"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "session expired, please log in again"})
 			c.Abort()
 			return
 		}
 
 		// Store user info in context for handlers to use
-		c.Set("sub", userInfo.Sub)
-		c.Set("email", userInfo.Email)
-		c.Set("name", userInfo.Name)
-		c.Set("picture", userInfo.Picture)
+		c.Set("sub", session.UserID)
+		c.Set("email", session.Email)
+		c.Set("name", session.Name)
+		c.Set("picture", session.Picture)
+		c.Set("email_verified", session.EmailVerified)
+		c.Set("given_name", session.GivenName)
+		c.Set("family_name", session.FamilyName)
+		c.Set("locale", session.Locale)
 
 		// If session has a username, set it in the context
 		if session.Username != "" {

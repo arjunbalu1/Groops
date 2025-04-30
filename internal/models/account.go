@@ -17,21 +17,24 @@ type ActivityLog struct {
 
 // Account represents a user account in the system
 type Account struct {
-	GoogleID              string        `gorm:"uniqueIndex;size:128;not null" json:"google_id"`
-	Username              string        `gorm:"primaryKey;size:30;not null" json:"username" binding:"required,alphanum"`
-	Email                 string        `gorm:"uniqueIndex;size:255;not null" json:"email" binding:"required,email"`
-	DateJoined            time.Time     `gorm:"not null" json:"date_joined"`
-	Rating                float64       `gorm:"type:decimal(3,2);not null;default:5.0" json:"rating"`
-	Bio                   string        `gorm:"type:text" json:"bio"`
-	AvatarURL             string        `gorm:"size:512" json:"avatar_url"`
-	EncryptedRefreshToken string        `gorm:"type:text" json:"-"` // Encrypted OAuth refresh token
-	TokenExpiry           time.Time     `gorm:"index" json:"-"`     // When the OAuth token expires
-	Activities            []ActivityLog `gorm:"foreignKey:Username" json:"activities"`
-	OwnedGroups           []Group       `gorm:"foreignKey:OrganiserID" json:"owned_groups"`
-	JoinedGroups          []GroupMember `gorm:"foreignKey:Username" json:"joined_groups"`
-	LastLogin             time.Time     `gorm:"not null" json:"last_login"`
-	CreatedAt             time.Time     `gorm:"not null" json:"created_at"`
-	UpdatedAt             time.Time     `gorm:"not null" json:"updated_at"`
+	GoogleID      string        `gorm:"uniqueIndex;size:128;not null" json:"google_id"`
+	Username      string        `gorm:"primaryKey;size:30;not null" json:"username" binding:"required,alphanum"`
+	Email         string        `gorm:"uniqueIndex;size:255;not null" json:"email" binding:"required,email"`
+	EmailVerified bool          `gorm:"not null;default:false" json:"email_verified"`
+	FullName      string        `gorm:"size:255" json:"full_name"`
+	GivenName     string        `gorm:"size:100" json:"given_name"`
+	FamilyName    string        `gorm:"size:100" json:"family_name"`
+	Locale        string        `gorm:"size:10" json:"locale"`
+	DateJoined    time.Time     `gorm:"not null" json:"date_joined"`
+	Rating        float64       `gorm:"type:decimal(3,2);not null;default:5.0" json:"rating"`
+	Bio           string        `gorm:"type:text" json:"bio"`
+	AvatarURL     string        `gorm:"size:512" json:"avatar_url"`
+	Activities    []ActivityLog `gorm:"foreignKey:Username" json:"activities"`
+	OwnedGroups   []Group       `gorm:"foreignKey:OrganiserID" json:"owned_groups"`
+	JoinedGroups  []GroupMember `gorm:"foreignKey:Username" json:"joined_groups"`
+	LastLogin     time.Time     `gorm:"not null" json:"last_login"`
+	CreatedAt     time.Time     `gorm:"not null" json:"created_at"`
+	UpdatedAt     time.Time     `gorm:"not null" json:"updated_at"`
 }
 
 // BeforeCreate hook is called before creating a new account

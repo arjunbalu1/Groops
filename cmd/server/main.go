@@ -22,11 +22,6 @@ func main() {
 		}
 	}
 
-	// Initialize encryption
-	if err := auth.InitCrypto(); err != nil {
-		log.Fatalf("Failed to initialize encryption: %v", err)
-	}
-
 	// Initialize Google OAuth
 	if err := auth.InitOAuth(); err != nil {
 		log.Fatalf("Failed to initialize Google OAuth: %v", err)
