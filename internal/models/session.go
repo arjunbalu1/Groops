@@ -21,6 +21,8 @@ type Session struct {
 	GivenName     string    `gorm:"size:100" json:"-"`               // First name
 	FamilyName    string    `gorm:"size:100" json:"-"`               // Last name
 	Locale        string    `gorm:"size:10" json:"-"`                // User's locale
+	IPAddress     string    `gorm:"size:45" json:"-"`                // User's IP address
+	UserAgent     string    `gorm:"size:255" json:"-"`               // User's browser/device info
 	CreatedAt     time.Time `gorm:"not null" json:"-"`
 	ExpiresAt     time.Time `gorm:"index" json:"-"`
 }
@@ -43,7 +45,3 @@ func (s *Session) IsExpired() bool {
 	return time.Now().After(s.ExpiresAt)
 }
 
-// HasActiveUser returns true if the session is associated with a registered user
-func (s *Session) HasActiveUser() bool {
-	return s.Username != ""
-}

@@ -4,6 +4,7 @@ import (
 	"groops/internal/auth"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,7 +43,7 @@ func LogoutHandler(c *gin.Context) {
 // DashboardHandler serves the user dashboard page
 func DashboardHandler(c *gin.Context) {
 	username := c.GetString("username")
-	if username == "" {
+	if username == "" || strings.HasPrefix(username, "temp-") {
 		c.Redirect(http.StatusTemporaryRedirect, "/create-profile")
 		return
 	}
@@ -51,6 +52,14 @@ func DashboardHandler(c *gin.Context) {
 
 // CreateProfilePageHandler serves the profile creation page
 func CreateProfilePageHandler(c *gin.Context) {
+	// Check if user already has a non-temporary profile
+	username := c.GetString("username")
+	if username != "" && !strings.HasPrefix(username, "temp-") {
+		// User already has a permanent profile, redirect to dashboard
+		c.Redirect(http.StatusTemporaryRedirect, "/dashboard")
+		return
+	}
+
 	// Show the profile creation form for new users
 	email := c.GetString("email")
 	name := c.GetString("name")

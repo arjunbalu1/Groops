@@ -56,6 +56,8 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 		GivenName:     userInfo.GivenName,
 		FamilyName:    userInfo.FamilyName,
 		Locale:        userInfo.Locale,
+		IPAddress:     c.ClientIP(),
+		UserAgent:     c.Request.UserAgent(),
 		CreatedAt:     time.Now(),
 		ExpiresAt:     time.Now().Add(models.SessionDuration),
 	}
@@ -148,8 +150,9 @@ func DeleteSession(c *gin.Context) {
 		db.Where("id = ?", sessionID).Delete(&models.Session{})
 	}
 
-	// Clear the session cookie
-	c.SetCookie(SessionCookieName, "", -1, "/", "", false, true)
+	// Clear the session cookie with the same secure setting as creation
+	secure := gin.Mode() != gin.DebugMode
+	c.SetCookie(SessionCookieName, "", -1, "/", "", secure, true)
 }
 
 // SetOAuthState generates and stores a random state for CSRF protection
