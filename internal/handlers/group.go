@@ -175,7 +175,7 @@ func LogActivity(username string, eventType string, groupID string) error {
 	err := db.Create(&activity).Error
 	if err != nil {
 		log.Printf("Warning: Failed to log activity: %v", err)
-	}
+		}
 	return err
 }
 

@@ -90,3 +90,16 @@ type Notification struct {
 	CreatedAt         time.Time `gorm:"not null" json:"created_at"`
 	Read              bool      `gorm:"not null;default:false" json:"read"`
 }
+
+// LoginLog represents a user login/logout history record
+type LoginLog struct {
+	ID         uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Username   string     `gorm:"size:30;not null;index" json:"username"`
+	GoogleID   string     `gorm:"size:128;not null" json:"google_id"`
+	LoginTime  time.Time  `gorm:"not null;index" json:"login_time"`
+	LogoutTime *time.Time `json:"logout_time"` // Nullable - will be null until logout
+	IPAddress  string     `gorm:"size:45" json:"ip_address"`
+	UserAgent  string     `gorm:"size:255" json:"user_agent"`
+	SessionID  string     `gorm:"size:64;uniqueIndex" json:"session_id"`
+	IsTemp     bool       `gorm:"not null" json:"is_temp"` // Flag for temp accounts
+}

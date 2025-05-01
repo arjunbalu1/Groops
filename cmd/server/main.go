@@ -29,7 +29,7 @@ func main() {
 
 	// Initialize database
 	if err := database.InitDB(); err != nil {
-		log.Fatal("Failed to initialize database:", err)
+		log.Fatalf("Failed to initialize database:", err)
 	}
 
 	// Initialize Gin router
@@ -47,10 +47,10 @@ func main() {
 	router.GET("/auth/google/callback", handlers.GoogleCallbackHandler)
 	router.GET("/auth/logout", handlers.LogoutHandler)
 
-	// Account creation page - requires authentication but not a full user profile
 	authPageGroup := router.Group("/")
 	authPageGroup.Use(auth.AuthMiddleware())
 	{
+		// Account creation page - requires authentication but not a full user profile
 		authPageGroup.GET("/create-profile", handlers.CreateProfilePageHandler)
 		authPageGroup.GET("/dashboard", handlers.DashboardHandler)
 	}

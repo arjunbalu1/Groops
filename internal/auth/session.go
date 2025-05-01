@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -58,13 +59,30 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 		CreatedAt:     time.Now(),
 		ExpiresAt:     time.Now().Add(models.SessionDuration),
 	}
-	if len(username) > 0 {
-		session.Username = username[0]
-	}
+
+	// Set username and check if it's a temporary account
+	isTemp := strings.HasPrefix(username[0], "temp-")
+	session.Username = username[0]
 
 	// Store the session in the database
 	if err := db.Create(&session).Error; err != nil {
 		return fmt.Errorf("failed to store session: %w", err)
+	}
+
+	// Log login activity
+	loginLog := models.LoginLog{
+		Username:  session.Username,
+		GoogleID:  userInfo.Sub,
+		LoginTime: time.Now(),
+		IPAddress: c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		SessionID: sessionID,
+		IsTemp:    isTemp,
+	}
+
+	if err := db.Create(&loginLog).Error; err != nil {
+		// Just log the error, don't fail the login process
+		fmt.Printf("Warning: Failed to create login log: %v\n", err)
 	}
 
 	// Set the session cookie
@@ -114,8 +132,19 @@ func DeleteSession(c *gin.Context) {
 	// Get the session ID
 	sessionID, err := c.Cookie(SessionCookieName)
 	if err == nil {
-		// Delete from database
+		// Get database connection
 		db := database.GetDB()
+
+		// Update login log with logout time
+		now := time.Now()
+		if err := db.Model(&models.LoginLog{}).
+			Where("session_id = ?", sessionID).
+			Update("logout_time", now).Error; err != nil {
+			// Just log the error, continue with session deletion
+			fmt.Printf("Warning: Failed to update login log with logout time: %v\n", err)
+		}
+
+		// Delete from database
 		db.Where("id = ?", sessionID).Delete(&models.Session{})
 	}
 

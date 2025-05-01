@@ -145,8 +145,8 @@ func HandleGoogleCallback(c *gin.Context) {
 		fmt.Printf("Warning: Failed to create temporary account: %v\n", err)
 	}
 
-	// Create session without username
-	if err := CreateSession(c, userInfo); err != nil {
+	// Create session with temporary username
+	if err := CreateSession(c, userInfo, tempUsername); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
 		c.Abort()
 		return

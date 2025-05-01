@@ -144,39 +144,9 @@ func CreateProfile(c *gin.Context) {
 		return
 	}
 
-	// If we get here, we need to create a new account (should rarely happen
-	// since we create temp accounts during OAuth)
-	account := models.Account{
-		GoogleID:      sub,
-		Username:      req.Username,
-		Email:         email,
-		EmailVerified: emailVerified,
-		FullName:      name,
-		GivenName:     givenName,
-		FamilyName:    familyName,
-		Locale:        locale,
-		DateJoined:    now,
-		Rating:        5.0,
-		LastLogin:     now,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-		Bio:           req.Bio,
-		AvatarURL:     avatarURL,
-	}
-
-	if err := db.Create(&account).Error; err != nil {
-		log.Printf("Error: Failed to create profile: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create profile"})
-		return
-	}
-
-	// Link the session to the new user
-	if err := auth.LinkSessionToUser(sessionID, req.Username); err != nil {
-		// Non-fatal error - log but don't fail the request
-		log.Printf("Warning: Failed to link session to user: %v", err)
-	}
-
-	c.JSON(http.StatusCreated, account)
+	// No existing account found - this should never happen in normal flow
+	log.Printf("Error: No temporary account found for Google ID: %s", sub)
+	c.JSON(http.StatusBadRequest, gin.H{"error": "No temporary account found. Please try logging in again."})
 }
 
 // UpdateAccount allows a user to update their profile (bio, avatar_url)
