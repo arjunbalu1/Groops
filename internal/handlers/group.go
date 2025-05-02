@@ -93,9 +93,8 @@ func CreateGroup(c *gin.Context) {
 	c.JSON(http.StatusCreated, group)
 }
 
-// GetGroups handles listing all groups with filtering, sorting, and pagination
-// Don't know what is going on here with sort parameter validation and numeric type conversion
-// But it is for SQL injection protection
+// GetGroups handles listing all groups with filtering, sorting, and pagination.
+// Don't know what's going on here with sort parameter validation and numeric type conversion, but it's SQL injection safe.
 func GetGroups(c *gin.Context) {
 	db := database.GetDB()
 	var groups []models.Group
