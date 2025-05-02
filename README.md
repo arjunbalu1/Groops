@@ -110,13 +110,6 @@ Example: `/api/groups?activity_type=sport&skill_level=beginner&sort_by=date_time
 3. **Session**: A secure cookie (`groops_session`) authenticates all future requests
 4. **Auto-linking**: Returning users' sessions are automatically linked to their existing profiles
 
-## 💡 Development Tips
-
-- Update your profile with: `PUT /api/profile` (uses your session identity)
-- Create groups without specifying an organizer (it's extracted from your session)
-- The API validates all input strictly to ensure data integrity
-- Session cookies handle all authentication; no JWT or API keys needed
-
 ## 🧰 Troubleshooting
 
 - **Auth errors**: If you see `authentication required`, your session may have expired - login again
