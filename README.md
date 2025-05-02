@@ -1,47 +1,27 @@
-# Groops
+# Groops 🌍
 
-A group management platform where people can host and join activity-based groups with location, filtering, and social features.
+> A social platform for activity-based group creation and participation
 
-## Table of Contents
+Groops is a powerful backend API (currently) that enables users to create, join, and manage activity-based groups with location services, advanced filtering, and social features.
 
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Setup Instructions](#setup-instructions)
-- [Authentication & Session Flow](#authentication--session-flow)
-- [API Endpoints](#api-endpoints)
-- [Data Models](#data-models)
-- [Database Reset](#database-reset)
-- [Postman & API Demo Guide](#postman--api-demo-guide)
-- [Troubleshooting](#troubleshooting)
-- [Environment Variables](#environment-variables)
-- [Development Notes](#development-notes)
+## 📋 Features
 
----
+- **Streamlined Authentication**: Google OAuth integration with secure session management
+- **Rich Profile System**: Customizable user profiles with bio and avatar
+- **Group Management**: Create, join, leave, and manage groups for various activities
+- **Advanced Filtering**: Find groups by activity type, skill level, price, date, and more
+- **Activity Tracking**: Comprehensive history of user participation
+- **Location Services**: Geographic search and venue management
+- **Notifications**: Real-time notification system for group events
 
-## Features
+## 🛠️ Technologies
 
-- **Google OAuth Authentication**: Secure login with Google, no passwords required
-- **Profile Management**: Users can update their bio and avatar
-- **Group Creation & Management**: Create, join, leave, and manage groups for different activities
-- **Filtering, Sorting, Pagination**: Find groups by activity, skill, price, date, and more
-- **Activity Tracking**: Track user participation and group activity
-- **Location-Based Features**: Store and search for groups by venue
-- **Enhanced Security**: Secure cookies, input validation, and CSRF protection
+- **Backend**: Go, Gin Web Framework
+- **Database**: PostgreSQL with GORM ORM
+- **Authentication**: Google OAuth 2.0
+- **API Design**: RESTful architecture with JSON
 
----
-
-## Technologies Used
-
-- Go (Golang)
-- Gin Web Framework
-- GORM ORM
-- PostgreSQL
-- Google OAuth2
-- RESTful API design
-
----
-
-## Setup Instructions
+## 🚀 Getting Started
 
 ### Prerequisites
 
@@ -52,198 +32,124 @@ A group management platform where people can host and join activity-based groups
 ### Installation
 
 1. Clone the repository:
-    ```sh
-    git clone https://github.com/arjunbalu1/Groops.git
-    cd Groops
-    ```
+   ```sh
+   git clone https://github.com/arjunbalu1/Groops.git
+   cd Groops
+   ```
 
-2. Copy the environment variables example file and update with your configuration:
-    ```sh
-    cp .env.example .env
-    ```
+2. Configure environment variables:
+   ```sh
+   cp .env.example .env
+   # Edit .env with your database and OAuth credentials
+   ```
 
-3. Set up the PostgreSQL database:
-    - **Option 1: Terminal**
-      ```sh
-      createdb -U postgres groops
-      ```
-    - **Option 2: pgAdmin**
-      - Open pgAdmin, right-click "Databases" → Create → Database, name it `groops`.
+3. Set up the database:
+   ```sh
+   createdb -U postgres groops
+   ```
 
-4. Run the server:
-    ```sh
-    go run cmd/server/main.go
-    ```
-    The server will start on the port specified in your `.env` file (defaults to 8080).
+4. Start the server:
+   ```sh
+   go run cmd/server/main.go
+   ```
 
----
+## 🔌 API Reference
 
-## Authentication & Session Flow
+### Auth Endpoints
 
-- **Login:** Users authenticate via Google OAuth (`/auth/login`).
-- **Profile Creation:** On first login, users are prompted to create a profile (choose a username, set bio/avatar).
-- **Session:** After profile creation, all requests are authenticated via a secure session cookie (`groops_session`).
-- **Re-login:** If your session expires, logging in again with Google will automatically link your session to your existing profile (by Google ID).
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/auth/login` | Start Google OAuth flow |
+| GET | `/auth/logout` | Clear session |
 
----
+### Profile Endpoints
 
-## API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/accounts/:username` | Get user profile |
+| PUT | `/api/profile` | Update your profile (requires auth) |
+| POST | `/api/profile/register` | Create profile after OAuth login |
 
-### Health & Info
-- `GET /health` — Check if the server is running
-- `GET /` — Welcome message
+### Group Endpoints
 
-### Authentication
-- `GET /auth/login` — Start Google OAuth login
-- `GET /auth/logout` — Logout and clear session
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/groups` | Create a new group |
+| GET | `/api/groups` | List groups (with filters) |
+| POST | `/api/groups/:group_id/join` | Request to join a group |
+| POST | `/api/groups/:group_id/leave` | Leave a group |
+| GET | `/api/groups/:group_id/pending-members` | List pending join requests |
+| POST | `/api/groups/:group_id/members/:username/approve` | Approve join request |
+| POST | `/api/groups/:group_id/members/:username/reject` | Reject join request |
 
-### Account/Profile
-- `GET /api/accounts/:username` — Get account details
-- `PUT /api/accounts/:username` — Update your profile (bio, avatar)
-- `POST /api/profile/register` — Register your profile after OAuth login
+### Notification Endpoints
 
-### Groups
-- `POST /api/groups` — Create a new group (no organizer_username in payload; backend uses your session)
-- `GET /api/groups` — List groups (supports filtering, sorting, pagination)
-- `POST /api/groups/:group_id/join` — Request to join a group
-- `POST /api/groups/:group_id/leave` — Leave a group
-- `GET /api/groups/:group_id/pending-members` — List pending join requests (organiser only)
-- `POST /api/groups/:group_id/members/:username/approve` — Approve join request
-- `POST /api/groups/:group_id/members/:username/reject` — Reject join request
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/notifications` | List your notifications |
+| GET | `/api/notifications/unread-count` | Get unread count |
 
-### Notifications
-- `GET /api/notifications` — List notifications
-- `GET /api/notifications/unread-count` — Get unread notification count
+## 🔍 Group Filtering
 
----
+The `/api/groups` endpoint supports powerful filtering with query parameters:
 
-## Filtering, Sorting, and Pagination
+- `activity_type` - Filter by activity category (sport, social, games, other)
+- `skill_level` - Filter by required skill (beginner, intermediate, advanced)
+- `min_price`/`max_price` - Price range filtering
+- `date_from`/`date_to` - Date range filtering
+- `organiser_id` - Filter by group creator
+- `sort_by`/`sort_order` - Control result ordering
+- `limit`/`offset` - Pagination controls
 
-The `/api/groups` endpoint supports the following query parameters:
+Example: `/api/groups?activity_type=sport&skill_level=beginner&sort_by=date_time&sort_order=asc`
 
-| Parameter      | Type     | Description / Example Value                |
-|----------------|----------|-------------------------------------------|
-| activity_type  | string   | sport, social, games, other               |
-| skill_level    | string   | beginner, intermediate, advanced          |
-| min_price      | float    | Minimum cost per person                   |
-| max_price      | float    | Maximum cost per person                   |
-| date_from      | date     | Only events after this date (YYYY-MM-DD)  |
-| date_to        | date     | Only events before this date              |
-| organiser_id   | string   | Filter by organiser username              |
-| min_members    | int      | Groups with at least this many members    |
-| max_members    | int      | Groups with at most this many members     |
-| name           | string   | Search by group name (partial match)      |
-| sort_by        | string   | Field to sort by (e.g., date_time, cost)  |
-| sort_order     | string   | asc or desc                              |
-| limit          | int      | Results per page (default 10, max 100)    |
-| offset         | int      | Pagination offset (default 0)             |
+## 🔒 Authentication Flow
 
-**Example:**
+1. **Login**: User authenticates via Google OAuth (`/auth/login`)
+2. **Profile Creation**: First-time users create a profile with username, bio, and avatar
+3. **Session**: A secure cookie (`groops_session`) authenticates all future requests
+4. **Auto-linking**: Returning users' sessions are automatically linked to their existing profiles
+
+## 💡 Development Tips
+
+- Update your profile with: `PUT /api/profile` (uses your session identity)
+- Create groups without specifying an organizer (it's extracted from your session)
+- The API validates all input strictly to ensure data integrity
+- Session cookies handle all authentication; no JWT or API keys needed
+
+## 🧰 Troubleshooting
+
+- **Auth errors**: If you see `authentication required`, your session may have expired - login again
+- **DB issues**: Ensure your PostgreSQL server is running and credentials are correct
+- **Profile updates**: Use the `/api/profile` endpoint which uses your session identity
+- **Dependencies**: Run `go mod tidy` to ensure all dependencies are up to date
+
+## 🌐 Environment Variables
+
+Configure the following in your `.env` file:
+
 ```
-GET /api/groups?activity_type=sport&skill_level=beginner&sort_by=cost&sort_order=desc&limit=5&offset=0
+# Database
+DB_HOST=localhost
+DB_USER=postgres
+DB_PASSWORD=yourpassword
+DB_NAME=groops
+DB_PORT=5432
+
+# Server
+PORT=8080
+
+# OAuth
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URL=http://localhost:8080/auth/google/callback
+
+# Environment
+APP_ENV=development
 ```
 
 ---
 
-## Data Models
+## 🤝 Contributing
 
-(See `internal/models/` for full struct definitions)
-
-### Account
-- `Username` (Primary Key)
-- `Email`
-- `GoogleID`
-- `DateJoined`
-- `Rating`
-- `Bio`
-- `AvatarURL`
-- `Activities` (ActivityLog)
-- `OwnedGroups` (Group)
-- `JoinedGroups` (GroupMember)
-- `LastLogin`
-- `CreatedAt`
-- `UpdatedAt`
-
-### Group
-- `ID` (Primary Key)
-- `Name`
-- `DateTime`
-- `Venue` (JSONB)
-- `Cost`
-- `SkillLevel`
-- `ActivityType`
-- `MaxMembers`
-- `Description`
-- `OrganiserID`
-- `Members` (GroupMember)
-- `CreatedAt`
-- `UpdatedAt`
-
-### GroupMember
-- `GroupID` (Primary Key, Foreign Key)
-- `Username` (Primary Key, Foreign Key)
-- `Status` (pending, approved, rejected)
-- `JoinedAt`
-- `UpdatedAt`
-
-### ActivityLog
-- `ID` (Primary Key)
-- `Username` (Foreign Key)
-- `EventType` (create_group, join_group, etc.)
-- `GroupID`
-- `Timestamp`
-
----
-
-## Database Reset
-
-**To reset your database (development):**
-
-- **Terminal:**
-  ```sh
-  psql -U postgres -h localhost -c "DROP DATABASE IF EXISTS groops;"
-  psql -U postgres -h localhost -c "CREATE DATABASE groops;"
-  ```
-- **pgAdmin:**
-  - Right-click the `groops` database → Delete/Drop
-  - Right-click "Databases" → Create → Database, name it `groops`
-
-After resetting, restart your Go server to re-run migrations and recreate all tables.
-
----
-
-## Postman & API Demo Guide
-
-- See `API_DEMO_GUIDE.md` for a step-by-step guide to using all endpoints with Postman, including authentication and session cookie handling.
-- All authenticated requests require the `groops_session` cookie (see the guide for details).
-
----
-
-## Troubleshooting
-
-- **Database errors:** Ensure your database exists and credentials in `.env` are correct.
-- **Migrations:** If tables are missing, reset the DB and restart the server.
-- **Session/cookie issues:** If you get `authentication required`, repeat the OAuth login and use the new session cookie.
-- **Group creation:** Do not include `organizer_username` in the payload; the backend uses your session.
-- **Stale dependencies:** Run `go get -u ./...` and `go mod tidy` to update dependencies.
-
----
-
-## Environment Variables
-
-- `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`: Database config
-- `PORT`: Server port (default 8080)
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL`: Google OAuth config
-- `APP_ENV`: Application environment (development/production)
-
----
-
-## Development Notes
-
-- Passwords are not used; all authentication is via Google OAuth.
-- Strict environment variable validation at startup.
-- See `sketch.pdf` for UI/UX ideas.
-
----
-
-If you have any questions or want to contribute, please open an issue or pull request!
+Contributions are welcome! Please feel free to submit a Pull Request. 
