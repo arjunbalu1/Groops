@@ -216,6 +216,10 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Store user info in context for handlers to use
+	    // If session has a username, set it in the context
+		if session.Username != "" {
+			c.Set("username", session.Username)
+		}
 		c.Set("sub", session.UserID)
 		c.Set("email", session.Email)
 		c.Set("name", session.Name)
@@ -224,11 +228,6 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("given_name", session.GivenName)
 		c.Set("family_name", session.FamilyName)
 		c.Set("locale", session.Locale)
-
-		// If session has a username, set it in the context
-		if session.Username != "" {
-			c.Set("username", session.Username)
-		}
 
 		c.Next()
 	}

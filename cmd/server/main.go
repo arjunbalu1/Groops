@@ -62,7 +62,7 @@ func main() {
 		// Account routes
 		api.GET("/accounts/:username", handlers.GetAccount)
 		api.GET("/accounts/:username/history", handlers.GetAccountEventHistory)
-		api.PUT("/accounts/:username", handlers.UpdateAccount)
+		api.PUT("/profile", handlers.UpdateAccount)
 
 		// Group routes
 		api.POST("/groups", handlers.CreateGroup)

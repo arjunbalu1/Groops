@@ -151,13 +151,12 @@ func CreateProfile(c *gin.Context) {
 
 // UpdateAccount allows a user to update their profile (bio, avatar_url)
 func UpdateAccount(c *gin.Context) {
-	username := c.Param("username")
-	requester := c.GetString("username")
+	username := c.GetString("username")
 
-	// Only the user themselves can update their profile
-	if username != requester {
-		log.Printf("Error: You can only update your own profile")
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own profile"})
+	// Check if username exists in the session
+	if username == "" {
+		log.Printf("Error: No authenticated user found")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
 	}
 
