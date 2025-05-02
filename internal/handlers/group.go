@@ -94,6 +94,8 @@ func CreateGroup(c *gin.Context) {
 }
 
 // GetGroups handles listing all groups with filtering, sorting, and pagination
+// Don't know what is going on here with sort parameter validation and numeric type conversion
+// But it is for SQL injection protection
 func GetGroups(c *gin.Context) {
 	db := database.GetDB()
 	var groups []models.Group
@@ -108,10 +110,14 @@ func GetGroups(c *gin.Context) {
 		query = query.Where("skill_level = ?", skillLevel)
 	}
 	if minPrice := c.Query("min_price"); minPrice != "" {
-		query = query.Where("cost >= ?", minPrice)
+		if price, err := strconv.ParseFloat(minPrice, 64); err == nil {
+			query = query.Where("cost >= ?", price)
+		}
 	}
 	if maxPrice := c.Query("max_price"); maxPrice != "" {
-		query = query.Where("cost <= ?", maxPrice)
+		if price, err := strconv.ParseFloat(maxPrice, 64); err == nil {
+			query = query.Where("cost <= ?", price)
+		}
 	}
 	if dateFrom := c.Query("date_from"); dateFrom != "" {
 		query = query.Where("date_time >= ?", dateFrom)
@@ -123,34 +129,56 @@ func GetGroups(c *gin.Context) {
 		query = query.Where("organiser_id = ?", organiserID)
 	}
 	if minMembers := c.Query("min_members"); minMembers != "" {
-		query = query.Where("max_members >= ?", minMembers)
+		if members, err := strconv.Atoi(minMembers); err == nil {
+			query = query.Where("max_members >= ?", members)
+		}
 	}
 	if maxMembers := c.Query("max_members"); maxMembers != "" {
-		query = query.Where("max_members <= ?", maxMembers)
+		if members, err := strconv.Atoi(maxMembers); err == nil {
+			query = query.Where("max_members <= ?", members)
+		}
 	}
 	if name := c.Query("name"); name != "" {
 		query = query.Where("name ILIKE ?", "%"+name+"%")
 	}
 
-	// Sorting
+	// Sorting with validation
 	sortBy := c.DefaultQuery("sort_by", "date_time")
+	// Validate sort column against allowed values
+	validSortColumns := map[string]bool{
+		"date_time": true, "name": true, "cost": true,
+		"skill_level": true, "activity_type": true, "max_members": true,
+		"created_at": true, "updated_at": true,
+	}
+	if !validSortColumns[sortBy] {
+		sortBy = "date_time" // Default to safe value if invalid
+	}
+
+	// Validate sort order
 	sortOrder := c.DefaultQuery("sort_order", "asc")
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = "asc" // Default to ascending if invalid
+	}
+
 	query = query.Order(fmt.Sprintf("%s %s", sortBy, sortOrder))
 
 	// Pagination with defaults
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
-	limit, err1 := strconv.Atoi(limitStr)
-	if err1 != nil || limit <= 0 {
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
 		limit = 10
 	}
 	if limit > 100 {
 		limit = 100 // max limit
 	}
-	offset, err2 := strconv.Atoi(offsetStr)
-	if err2 != nil || offset < 0 {
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
 		offset = 0
 	}
+
 	query = query.Limit(limit).Offset(offset)
 
 	if err := query.Find(&groups).Error; err != nil {
@@ -175,7 +203,7 @@ func LogActivity(username string, eventType string, groupID string) error {
 	err := db.Create(&activity).Error
 	if err != nil {
 		log.Printf("Warning: Failed to log activity: %v", err)
-		}
+	}
 	return err
 }
 
