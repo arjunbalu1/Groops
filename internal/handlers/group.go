@@ -53,7 +53,7 @@ func CreateGroup(c *gin.Context) {
 	group := models.Group{
 		Name:         request.Name,
 		DateTime:     request.DateTime,
-		Venue:        request.Venue,
+		Location:     request.Location,
 		Cost:         request.Cost,
 		SkillLevel:   models.SkillLevel(request.SkillLevel),
 		ActivityType: models.ActivityType(request.ActivityType),

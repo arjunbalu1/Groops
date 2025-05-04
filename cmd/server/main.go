@@ -8,6 +8,7 @@ import (
 	"groops/internal/auth"
 	"groops/internal/database"
 	"groops/internal/handlers"
+	"groops/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -30,6 +31,12 @@ func main() {
 	// Initialize database
 	if err := database.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Initialize Google Maps client
+	if err := services.InitMapsClient(); err != nil {
+		log.Printf("Warning: Failed to initialize Google Maps client: %v", err)
+		// Continue anyway - not critical for app startup
 	}
 
 	// Initialize Gin router
@@ -82,6 +89,9 @@ func main() {
 
 		// Profile registration for Google OAuth users
 		api.POST("/profile/register", handlers.CreateProfile)
+
+		// Location validation route
+		api.GET("/locations/validate", handlers.ValidateLocation)
 	}
 
 	// Start the server

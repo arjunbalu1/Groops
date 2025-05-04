@@ -89,6 +89,12 @@ Groops is a powerful backend API (currently) that enables users to create, join,
 | GET | `/api/notifications` | List your notifications |
 | GET | `/api/notifications/unread-count` | Get unread count |
 
+### Location Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/locations/validate?place_id=PLACE_ID` | Validate and get details for a Google Maps place |
+
 ## 🔍 Group Filtering
 
 The `/api/groups` endpoint supports powerful filtering with query parameters:
@@ -137,8 +143,6 @@ GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
 GOOGLE_REDIRECT_URL=http://localhost:8080/auth/google/callback
 
-# Environment
-APP_ENV=development
 ```
 
 ---

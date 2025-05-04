@@ -1,8 +1,6 @@
 package models
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -28,30 +26,6 @@ const (
 	Advanced     SkillLevel = "advanced"
 )
 
-// Venue represents a location using Google Maps data
-type Venue struct {
-	FormattedAddress string  `json:"formatted_address" binding:"required"`
-	PlaceID          string  `json:"place_id" binding:"required"`
-	Latitude         float64 `json:"latitude" binding:"required"`
-	Longitude        float64 `json:"longitude" binding:"required"`
-}
-
-// Implement driver.Valuer and sql.Scanner for JSONB storage
-func (v Venue) Value() (driver.Value, error) {
-	return json.Marshal(v)
-}
-
-func (v *Venue) Scan(value interface{}) error {
-	if value == nil {
-		return nil
-	}
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to unmarshal Venue: %v", value)
-	}
-	return json.Unmarshal(bytes, v)
-}
-
 // Member represents a user's membership status in a group
 type GroupMember struct {
 	GroupID   string    `gorm:"primaryKey;size:50" json:"group_id"`
@@ -66,7 +40,7 @@ type Group struct {
 	ID           string        `gorm:"primaryKey;size:50;not null" json:"id"`
 	Name         string        `gorm:"index;size:100;not null" json:"name"`
 	DateTime     time.Time     `gorm:"index;not null" json:"date_time"`
-	Venue        Venue         `gorm:"type:jsonb;not null" json:"venue"`
+	Location     Location      `gorm:"type:jsonb;not null" json:"location"`
 	Cost         float64       `gorm:"type:decimal(10,2);not null;default:0.0" json:"cost"`
 	SkillLevel   SkillLevel    `gorm:"type:varchar(20);index;not null;default:'beginner'" json:"skill_level"`
 	ActivityType ActivityType  `gorm:"type:varchar(20);index;not null" json:"activity_type"`
@@ -121,7 +95,7 @@ func (gm *GroupMember) BeforeSave(tx *gorm.DB) error {
 type CreateGroupRequest struct {
 	Name         string       `json:"name" binding:"required"`
 	DateTime     time.Time    `json:"date_time" binding:"required"`
-	Venue        Venue        `json:"venue" binding:"required"`
+	Location     Location     `json:"location" binding:"required"`
 	Cost         float64      `json:"cost"`
 	SkillLevel   SkillLevel   `json:"skill_level" binding:"required,oneof=beginner intermediate advanced"`
 	ActivityType ActivityType `json:"activity_type" binding:"required,oneof=sport social games other"`
