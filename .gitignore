@@ -34,3 +34,6 @@ Thumbs.db
 API_DEMO_GUIDE.md
 TODO.txt
 OAUTH.md
+
+# Database scripts
+reset_db.sh

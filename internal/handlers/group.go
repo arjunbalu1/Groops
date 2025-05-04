@@ -124,9 +124,6 @@ func GetGroups(c *gin.Context) {
 	if dateTo := c.Query("date_to"); dateTo != "" {
 		query = query.Where("date_time <= ?", dateTo)
 	}
-	if organiserID := c.Query("organiser_id"); organiserID != "" {
-		query = query.Where("organiser_id = ?", organiserID)
-	}
 	if minMembers := c.Query("min_members"); minMembers != "" {
 		if members, err := strconv.Atoi(minMembers); err == nil {
 			query = query.Where("max_members >= ?", members)
@@ -136,9 +133,6 @@ func GetGroups(c *gin.Context) {
 		if members, err := strconv.Atoi(maxMembers); err == nil {
 			query = query.Where("max_members <= ?", members)
 		}
-	}
-	if name := c.Query("name"); name != "" {
-		query = query.Where("name ILIKE ?", "%"+name+"%")
 	}
 
 	// Sorting with validation

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
+	"net/http"
 	"strings"
 	"time"
 
@@ -87,17 +88,23 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 		fmt.Printf("Warning: Failed to create login log: %v\n", err)
 	}
 
-	// Set the session cookie
+	// Set the session cookie with SameSite=Strict
 	secure := gin.Mode() != gin.DebugMode
-	c.SetCookie(
-		SessionCookieName,
-		sessionID,
-		int(time.Until(session.ExpiresAt).Seconds()),
-		"/",
-		"",
-		secure,
-		true, // HttpOnly for security
-	)
+
+	// Create cookie with SameSite=Strict
+	cookie := &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    sessionID,
+		Path:     "/",
+		Domain:   "",
+		MaxAge:   int(time.Until(session.ExpiresAt).Seconds()),
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	// Set the cookie in the response
+	http.SetCookie(c.Writer, cookie)
 
 	return nil
 }
@@ -152,7 +159,21 @@ func DeleteSession(c *gin.Context) {
 
 	// Clear the session cookie with the same secure setting as creation
 	secure := gin.Mode() != gin.DebugMode
-	c.SetCookie(SessionCookieName, "", -1, "/", "", secure, true)
+
+	// Create an expired cookie with SameSite=Strict
+	cookie := &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    "",
+		Path:     "/",
+		Domain:   "",
+		MaxAge:   -1,
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	// Set the cookie in the response
+	http.SetCookie(c.Writer, cookie)
 }
 
 // SetOAuthState generates and stores a random state for CSRF protection
@@ -162,18 +183,25 @@ func SetOAuthState(c *gin.Context) (string, error) {
 		return "", fmt.Errorf("failed to generate state: %w", err)
 	}
 
-	// Store state in a temporary cookie
+	// Store state in a temporary cookie with SameSite=Lax
 	// This cookie is only used during the OAuth flow and will be cleared after
+	// We use Lax instead of Strict to allow redirects from Google OAuth
 	secure := gin.Mode() != gin.DebugMode
-	c.SetCookie(
-		StateCookieName,
-		state,
-		int(10*time.Minute.Seconds()), // 10 minutes expiry
-		"/",
-		"",
-		secure,
-		true, // HttpOnly for security
-	)
+
+	// Create cookie with SameSite=Lax for OAuth flow
+	cookie := &http.Cookie{
+		Name:     StateCookieName,
+		Value:    state,
+		Path:     "/",
+		Domain:   "",
+		MaxAge:   int(10 * time.Minute.Seconds()), // 10 minutes expiry
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode, // Lax allows cookies on redirects from OAuth
+	}
+
+	// Set the cookie in the response
+	http.SetCookie(c.Writer, cookie)
 
 	return state, nil
 }
@@ -187,7 +215,21 @@ func VerifyOAuthState(c *gin.Context, receivedState string) bool {
 	}
 
 	// Clear the state cookie regardless of outcome
-	c.SetCookie(StateCookieName, "", -1, "/", "", false, true)
+	secure := gin.Mode() != gin.DebugMode
+	// Create an expired cookie with SameSite=Lax to match the setting used when creating it
+	cookie := &http.Cookie{
+		Name:     StateCookieName,
+		Value:    "",
+		Path:     "/",
+		Domain:   "",
+		MaxAge:   -1,
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode, // Match the setting used when creating
+	}
+
+	// Set the cookie in the response
+	http.SetCookie(c.Writer, cookie)
 
 	// Verify the state
 	return savedState == receivedState
