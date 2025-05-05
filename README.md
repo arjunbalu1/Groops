@@ -11,7 +11,7 @@ Groops is a powerful backend API (currently) that enables users to create, join,
 - **Group Management**: Create, join, leave, and manage groups for various activities
 - **Advanced Filtering**: Find groups by activity type, skill level, price, date, and more
 - **Activity Tracking**: Comprehensive history of user participation
-- **Location Services**: Geographic search and venue management
+- **Location Services**: Geographic search and venue management with Google Maps integration
 - **Notifications**: Real-time notification system for group events
 
 ## 🛠️ Technologies
@@ -19,6 +19,7 @@ Groops is a powerful backend API (currently) that enables users to create, join,
 - **Backend**: Go, Gin Web Framework
 - **Database**: PostgreSQL with GORM ORM
 - **Authentication**: Google OAuth 2.0
+- **Maps Integration**: Google Maps Places API
 - **API Design**: RESTful architecture with JSON
 
 ## 🚀 Getting Started
@@ -82,6 +83,12 @@ Groops is a powerful backend API (currently) that enables users to create, join,
 | POST | `/api/groups/:group_id/members/:username/approve` | Approve join request |
 | POST | `/api/groups/:group_id/members/:username/reject` | Reject join request |
 
+### Location Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/locations/validate?place_id=PLACE_ID` | Validate and standardize a Google Place ID |
+
 ### Notification Endpoints
 
 | Method | Endpoint | Description |
@@ -109,6 +116,29 @@ Example: `/api/groups?activity_type=sport&skill_level=beginner&sort_by=date_time
 2. **Profile Creation**: First-time users create a profile with username, bio, and avatar
 3. **Session**: A secure cookie (`groops_session`) authenticates all future requests
 4. **Auto-linking**: Returning users' sessions are automatically linked to their existing profiles
+
+## 🗺️ Location Services
+
+The platform integrates with Google Maps Places API to provide reliable and standardized location data:
+
+1. **Place ID Validation**: Validate Google Place IDs via `/api/locations/validate` endpoint
+2. **Standardized Location Data**: Store consistent location data including:
+   - Place ID (Google's unique identifier)
+   - Formatted address
+   - Place name
+   - Precise coordinates (latitude/longitude)
+3. **Location Storage**: Locations are stored as JSONB objects in the database with groups
+4. **Integration Flow**:
+   - Frontend sends a Place ID to validate
+   - Backend verifies and standardizes the location data
+   - Standardized location is then used with group creation/updates
+
+To implement the frontend integration:    (TODO:FRONTEND)
+1. Load the Google Maps JavaScript API with Places library
+2. Implement autocomplete search for locations
+3. Extract the Place ID from selected places
+4. Validate the Place ID with the backend
+5. Use the standardized location data for group creation
 
 ## 🧰 Troubleshooting
 
@@ -141,6 +171,12 @@ GOOGLE_REDIRECT_URL=http://localhost:8080/auth/google/callback
 GOOGLE_MAPS_API_KEY=your-maps-api-key
 
 ```
+
+To set up Google Maps:
+1. Create a project in Google Cloud Console
+2. Enable the Maps JavaScript API and Places API
+3. Create an API key with appropriate restrictions
+4. Add the key to your `.env` file
 
 ---
 
