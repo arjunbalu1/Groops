@@ -60,11 +60,12 @@ func main() {
 		// Account creation page - requires authentication but not a full user profile
 		authPageGroup.GET("/create-profile", handlers.CreateProfilePageHandler)
 		authPageGroup.GET("/dashboard", handlers.DashboardHandler)
+		authPageGroup.POST("/api/profile/register", handlers.CreateProfile)
 	}
 
 	// Protected API routes - require authentication with a full user profile
 	api := router.Group("/api")
-	api.Use(auth.AuthMiddleware())
+	api.Use(auth.AuthMiddleware(), auth.RequireFullProfileMiddleware())
 	{
 		// Account routes
 		api.GET("/accounts/:username", handlers.GetAccount)
@@ -86,9 +87,6 @@ func main() {
 		// Notification routes
 		api.GET("/notifications", handlers.ListNotifications)
 		api.GET("/notifications/unread-count", handlers.GetUnreadNotificationCount)
-
-		// Profile registration for Google OAuth users
-		api.POST("/profile/register", handlers.CreateProfile)
 
 		// Location validation route
 		api.GET("/locations/validate", handlers.ValidateLocation)

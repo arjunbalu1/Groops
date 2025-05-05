@@ -7,6 +7,7 @@ import (
 	"groops/internal/models"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -216,7 +217,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Store user info in context for handlers to use
-	    // If session has a username, set it in the context
+		// If session has a username, set it in the context
 		if session.Username != "" {
 			c.Set("username", session.Username)
 		}
@@ -229,6 +230,19 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("family_name", session.FamilyName)
 		c.Set("locale", session.Locale)
 
+		c.Next()
+	}
+}
+
+// RequireFullProfileMiddleware ensures the user has completed profile registration
+func RequireFullProfileMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := c.GetString("username")
+		if username == "" || strings.HasPrefix(username, "temp-") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Complete profile registration first"})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
