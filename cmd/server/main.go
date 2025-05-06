@@ -19,7 +19,7 @@ func main() {
 	if err := godotenv.Load("../../.env"); err != nil {
 		// Try standard location as fallback
 		if err := godotenv.Load(); err != nil {
-			log.Fatalf("Error loading .env file: %v", err)
+			log.Println("Warning: .env file not found, relying on environment variables")
 		}
 	}
 
