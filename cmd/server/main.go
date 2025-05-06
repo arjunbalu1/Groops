@@ -44,6 +44,12 @@ func main() {
 	reminderWorker.Start()
 	log.Println("Event reminder worker started")
 
+	// Set Gin mode based on environment
+	ginMode := os.Getenv("GIN_MODE")
+	if ginMode == "release" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	// Initialize Gin router
 	router := gin.Default()
 
