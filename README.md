@@ -1,6 +1,6 @@
 # Groops 🌍
 
-**The app is live at [https://groops.fun](https://groops.fun)!**
+**The app is live at [https://groops.fun](https://groops.fun)**
 
 All API calls should use the base URL: `https://groops.fun`
 
