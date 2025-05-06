@@ -47,4 +47,4 @@ services:
 
 databases:
   - name: groops-db
-    plan: standard 
+    plan: free 
