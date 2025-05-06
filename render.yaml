@@ -46,6 +46,7 @@ services:
           property: database
 
   # PostgreSQL Database
-  - type: pserv
+  - type: postgres
     name: groops-db
+    ipAllowList: []
     plan: standard 
