@@ -48,7 +48,4 @@ services:
   # PostgreSQL Database
   - type: pserv
     name: groops-db
-    plan: standard
-    env: postgres
-    version: "14"
-    ipAllowList: [] 
+    plan: standard 
