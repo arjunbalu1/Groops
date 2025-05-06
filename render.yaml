@@ -45,8 +45,6 @@ services:
           name: groops-db
           property: database
 
-  # PostgreSQL Database
-  - type: postgres
-    name: groops-db
-    ipAllowList: []
+databases:
+  - name: groops-db
     plan: standard 
