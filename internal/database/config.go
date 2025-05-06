@@ -2,11 +2,10 @@ package database
 
 import (
 	"fmt"
+	"groops/internal/models"
 	"log"
 	"os"
 	"time"
-
-	"groops/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -66,7 +65,6 @@ func InitDB() error {
 	sqlDB.SetMaxOpenConns(100)          // Maximum number of open connections
 	sqlDB.SetConnMaxLifetime(time.Hour) // Maximum lifetime of a connection
 
-	// Auto Migrate the schema
 	if err := DB.AutoMigrate(
 		&models.Account{},
 		&models.Group{},
@@ -75,6 +73,7 @@ func InitDB() error {
 		&models.Notification{},
 		&models.Session{},
 		&models.LoginLog{},
+		&models.ReminderSent{},
 	); err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}

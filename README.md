@@ -96,6 +96,16 @@ Groops is a powerful backend API (currently) that enables users to create, join,
 | GET | `/api/notifications` | List your notifications |
 | GET | `/api/notifications/unread-count` | Get unread count |
 
+## 📧 Email Notifications
+
+The platform sends email notifications using SendGrid for important events:
+
+- **Join Requests**: Group organizers receive an email when someone requests to join their group
+- **Join Approvals**: Users receive an email when their join request is approved
+- **Event Reminders**: Group members receive reminders 24 hours and 1 hour before events
+
+Email notifications are handled automatically by the system using a background worker that checks for upcoming events every 5 minutes.
+
 ## 🔍 Group Filtering
 
 The `/api/groups` endpoint supports powerful filtering with query parameters:

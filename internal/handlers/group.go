@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
+	"groops/internal/services"
 	"log"
 	"net/http"
 	"strconv"
@@ -299,6 +300,17 @@ func JoinGroup(c *gin.Context) {
 		log.Printf("Warning: Failed to create notification: %v", err)
 	}
 
+	// Send email notification to the group organizer
+	emailService := services.NewEmailService()
+	var organiserAccount models.Account
+	if err := db.Where("username = ?", group.OrganiserID).First(&organiserAccount).Error; err != nil {
+		log.Printf("Warning: Failed to find organizer account for email: %v", err)
+	} else {
+		if err := emailService.SendJoinRequestEmail(organiserAccount.Email, group.OrganiserID, username, group.Name); err != nil {
+			log.Printf("Warning: Failed to send join request email: %v", err)
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"message": "Join request submitted"})
 }
 
@@ -448,6 +460,17 @@ func ApproveJoinRequest(c *gin.Context) {
 	msg := "Your request to join group '" + group.Name + "' was approved"
 	if err := createNotification(db, username, "join_approved", msg, groupID); err != nil {
 		log.Printf("Warning: Failed to create approval notification: %v", err)
+	}
+
+	// Send email notification to the approved user
+	emailService := services.NewEmailService()
+	var userAccount models.Account
+	if err := db.Where("username = ?", username).First(&userAccount).Error; err != nil {
+		log.Printf("Warning: Failed to find user account for email: %v", err)
+	} else {
+		if err := emailService.SendJoinApprovalEmail(userAccount.Email, username, group.Name); err != nil {
+			log.Printf("Warning: Failed to send join approval email: %v", err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member approved"})

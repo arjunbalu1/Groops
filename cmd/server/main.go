@@ -39,6 +39,11 @@ func main() {
 		// Continue anyway - not critical for app startup
 	}
 
+	// Initialize and start the event reminder worker
+	reminderWorker := services.NewReminderWorker()
+	reminderWorker.Start()
+	log.Println("Event reminder worker started")
+
 	// Initialize Gin router
 	router := gin.Default()
 
