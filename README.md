@@ -1,5 +1,15 @@
 # Groops 🌍
 
+**The app is live at [https://groops.fun](https://groops.fun)!**
+
+All API calls should use the base URL: `https://groops.fun`
+
+Adjust any API requests accordingly. For example:
+
+```
+curl -X POST https://groops.fun/api/profile/register ...
+```
+
 > A social platform for activity-based group creation and participation
 
 Groops is a powerful backend API (currently) that enables users to create, join, and manage activity-based groups with location services, advanced filtering, and social features.
