@@ -153,8 +153,29 @@ func HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Wait a short time to ensure session is created
-	time.Sleep(500 * time.Millisecond)
+	// Verify session was created with a retry mechanism
+	maxRetries := 5
+	var sessionVerified bool
+
+	for i := 0; i < maxRetries; i++ {
+		// Check if session can be retrieved
+		_, err := c.Cookie(SessionCookieName)
+		if err == nil {
+			sessionVerified = true
+			break
+		}
+
+		// Increase wait time with each retry (exponential backoff)
+		waitTime := time.Duration(500*(i+1)) * time.Millisecond
+		fmt.Printf("Session not verified yet, retrying in %v (attempt %d/%d)\n", waitTime, i+1, maxRetries)
+		time.Sleep(waitTime)
+	}
+
+	if !sessionVerified {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify session creation after multiple attempts"})
+		c.Abort()
+		return
+	}
 
 	// Redirect to profile creation page
 	c.Redirect(http.StatusTemporaryRedirect, "/create-profile")
