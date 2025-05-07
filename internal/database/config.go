@@ -17,20 +17,27 @@ var DB *gorm.DB
 
 // InitDB initializes the database connection
 func InitDB() error {
-	// Database connection parameters from environment variables
-	host := getEnvRequired("DB_HOST")
-	user := getEnvRequired("DB_USER")
-	password := getEnvRequired("DB_PASSWORD")
-	dbname := getEnvRequired("DB_NAME")
-	port := getEnvRequired("DB_PORT")
-	sslMode := os.Getenv("DB_SSL_MODE")
-	if sslMode == "" {
-		sslMode = "disable" // Default to disable for local development
-	}
+	var dsn string
 
-	// Connection string
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC",
-		host, user, password, dbname, port, sslMode)
+	// Check if we're in production mode
+	if os.Getenv("GIN_MODE") == "release" {
+		// In production, use the Railway DATABASE_URL
+		dsn = getEnvRequired("DATABASE_URL")
+	} else {
+		// In development, use individual connection parameters
+		host := getEnvRequired("DB_HOST")
+		user := getEnvRequired("DB_USER")
+		password := getEnvRequired("DB_PASSWORD")
+		dbname := getEnvRequired("DB_NAME")
+		port := getEnvRequired("DB_PORT")
+		sslMode := os.Getenv("DB_SSL_MODE")
+		if sslMode == "" {
+			sslMode = "disable" // Default to disable for local development
+		}
+
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC connect_timeout=10",
+			host, user, password, dbname, port, sslMode)
+	}
 
 	// Configure GORM
 	gormConfig := &gorm.Config{
@@ -51,11 +58,24 @@ func InitDB() error {
 		DisableForeignKeyConstraintWhenMigrating: false, // Enable foreign key constraints
 	}
 
-	// Open connection
+	// Open connection with retry logic
 	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
+	maxRetries := 5
+	retryDelay := time.Second * 5
+
+	for i := 0; i < maxRetries; i++ {
+		DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
+		if err == nil {
+			break
+		}
+		log.Printf("Database connection attempt %d failed: %v", i+1, err)
+		if i < maxRetries-1 {
+			log.Printf("Retrying in %v...", retryDelay)
+			time.Sleep(retryDelay)
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return fmt.Errorf("failed to connect to database after %d attempts: %w", maxRetries, err)
 	}
 
 	// Configure connection pool
