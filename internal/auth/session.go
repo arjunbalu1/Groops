@@ -45,6 +45,16 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 	// Get database connection
 	db := database.GetDB()
 
+	// Get real client IP from headers
+	clientIP := c.ClientIP()
+	if forwardedFor := c.GetHeader("X-Forwarded-For"); forwardedFor != "" {
+		// Get the first IP in the chain
+		ips := strings.Split(forwardedFor, ",")
+		if len(ips) > 0 {
+			clientIP = strings.TrimSpace(ips[0])
+		}
+	}
+
 	// Create a new session with user info
 	session := models.Session{
 		ID:            sessionID,
@@ -57,7 +67,7 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 		GivenName:     userInfo.GivenName,
 		FamilyName:    userInfo.FamilyName,
 		Locale:        userInfo.Locale,
-		IPAddress:     c.ClientIP(),
+		IPAddress:     clientIP,
 		UserAgent:     c.Request.UserAgent(),
 		CreatedAt:     time.Now(),
 		ExpiresAt:     time.Now().Add(models.SessionDuration),
@@ -77,7 +87,7 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 		Username:  session.Username,
 		GoogleID:  userInfo.Sub,
 		LoginTime: time.Now(),
-		IPAddress: c.ClientIP(),
+		IPAddress: clientIP,
 		UserAgent: c.Request.UserAgent(),
 		SessionID: sessionID,
 		IsTemp:    isTemp,
