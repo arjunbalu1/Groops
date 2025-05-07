@@ -562,3 +562,89 @@ func GetGroupByID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// RemoveMember handles the removal of a member from a group by the organizer
+func RemoveMember(c *gin.Context) {
+	groupID := c.Param("group_id")
+	memberUsername := c.Param("username")
+	organizerUsername := c.GetString("username")
+
+	db := database.GetDB()
+
+	// Check if group exists
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		return
+	}
+
+	// Check if requester is the organizer
+	if group.OrganiserID != organizerUsername {
+		log.Printf("Error: User %s attempted to remove member from group %s but is not the organizer", organizerUsername, groupID)
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can remove members"})
+		return
+	}
+
+	// Prevent removal if event is happening soon (within 1 hour)
+	if group.DateTime.Sub(time.Now()) < time.Hour {
+		log.Printf("Error: Attempted to remove member too close to event time")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot remove members within 1 hour of the event"})
+		return
+	}
+
+	// Check if member exists and is approved
+	var member models.GroupMember
+	if err := db.Where("group_id = ? AND username = ? AND status = ?",
+		groupID, memberUsername, "approved").First(&member).Error; err != nil {
+		log.Printf("Error: Member not found or not approved: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Member not found or not approved"})
+		return
+	}
+
+	// Don't allow removing the organizer (themselves)
+	if memberUsername == organizerUsername {
+		log.Printf("Error: Organizer attempted to remove themselves")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Organizer cannot be removed"})
+		return
+	}
+
+	// Delete the member record
+	if err := db.Delete(&member).Error; err != nil {
+		log.Printf("Error: Failed to remove member: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member"})
+		return
+	}
+
+	// Create notification for the removed member
+	notification := models.Notification{
+		RecipientUsername: memberUsername,
+		Type:              "removed_from_group",
+		Message:           fmt.Sprintf("You have been removed from group '%s'", group.Name),
+		GroupID:           groupID,
+		CreatedAt:         time.Now(),
+		Read:              false,
+	}
+
+	if err := db.Create(&notification).Error; err != nil {
+		log.Printf("Warning: Failed to create notification: %v", err)
+	}
+
+	// Get member's email for notification
+	var account models.Account
+	if err := db.Where("username = ?", memberUsername).First(&account).Error; err == nil {
+		emailService := services.NewEmailService()
+		go func() {
+			if err := emailService.SendMemberRemovalEmail(account.Email, account.Username, group.Name); err != nil {
+				log.Printf("Warning: Failed to send email to removed member: %v", err)
+			}
+		}()
+	}
+
+	// Log the activity
+	if err := LogActivity(organizerUsername, "remove_member", groupID); err != nil {
+		log.Printf("Warning: Failed to log activity: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Member removed successfully"})
+}

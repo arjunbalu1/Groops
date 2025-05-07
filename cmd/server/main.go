@@ -94,6 +94,7 @@ func main() {
 		api.GET("/groups/:group_id/pending-members", handlers.ListPendingMembers)
 		api.POST("/groups/:group_id/members/:username/approve", handlers.ApproveJoinRequest)
 		api.POST("/groups/:group_id/members/:username/reject", handlers.RejectJoinRequest)
+		api.POST("/groups/:group_id/members/:username/remove", handlers.RemoveMember)
 
 		// Notification routes
 		api.GET("/notifications", handlers.ListNotifications)

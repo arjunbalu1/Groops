@@ -55,6 +55,19 @@ func (s *EmailService) SendJoinApprovalEmail(userEmail, userName, groupName stri
 	return err
 }
 
+// SendMemberRemovalEmail notifies user they've been removed from a group
+func (s *EmailService) SendMemberRemovalEmail(userEmail, userName, groupName string) error {
+	from := mail.NewEmail(s.fromName, s.fromEmail)
+	to := mail.NewEmail(userName, userEmail)
+	subject := fmt.Sprintf("You have been removed from %s", groupName)
+	plainContent := fmt.Sprintf("You have been removed from the group '%s'", groupName)
+	htmlContent := fmt.Sprintf("<p>You have been removed from the group '<strong>%s</strong>'</p>", groupName)
+
+	message := mail.NewSingleEmail(from, subject, to, plainContent, htmlContent)
+	_, err := s.client.Send(message)
+	return err
+}
+
 // SendEventReminderToGroup sends event reminders to all members in a group
 func (s *EmailService) SendEventReminderToGroup(group models.Group, members []models.Account, reminderType string) error {
 	from := mail.NewEmail(s.fromName, s.fromEmail)
