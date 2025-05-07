@@ -153,6 +153,9 @@ func HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
+	// Wait a short time to ensure session is created
+	time.Sleep(500 * time.Millisecond)
+
 	// Redirect to profile creation page
 	c.Redirect(http.StatusTemporaryRedirect, "/create-profile")
 }
