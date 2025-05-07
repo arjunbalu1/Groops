@@ -109,8 +109,25 @@ func HandleGoogleCallback(c *gin.Context) {
 			return
 		}
 
-		// Redirect to dashboard or home page
-		c.Redirect(http.StatusTemporaryRedirect, "/dashboard")
+		// Instead of immediate redirect, use client-side redirect with a delay
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecting...</title>
+    <script>
+        // Small delay to ensure cookie is set before redirect
+        setTimeout(function() {
+            window.location.href = "/dashboard";
+        }, 500); // 500ms delay
+    </script>
+</head>
+<body>
+    <p>Completing login, please wait...</p>
+</body>
+</html>
+`)
 		return
 	}
 
@@ -153,32 +170,25 @@ func HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Verify session was created with a retry mechanism
-	maxRetries := 5
-	var sessionVerified bool
-
-	for i := 0; i < maxRetries; i++ {
-		// Check if session can be retrieved
-		_, err := c.Cookie(SessionCookieName)
-		if err == nil {
-			sessionVerified = true
-			break
-		}
-
-		// Increase wait time with each retry (exponential backoff)
-		waitTime := time.Duration(500*(i+1)) * time.Millisecond
-		fmt.Printf("Session not verified yet, retrying in %v (attempt %d/%d)\n", waitTime, i+1, maxRetries)
-		time.Sleep(waitTime)
-	}
-
-	if !sessionVerified {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify session creation after multiple attempts"})
-		c.Abort()
-		return
-	}
-
-	// Redirect to profile creation page
-	c.Redirect(http.StatusTemporaryRedirect, "/create-profile")
+	// Instead of immediate redirect, use client-side redirect with a delay
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecting...</title>
+    <script>
+        // Small delay to ensure cookie is set before redirect
+        setTimeout(function() {
+            window.location.href = "/create-profile";
+        }, 500); // 500ms delay
+    </script>
+</head>
+<body>
+    <p>Completing login, please wait...</p>
+</body>
+</html>
+`)
 }
 
 // verifyIDToken verifies the ID token using Google's official library
