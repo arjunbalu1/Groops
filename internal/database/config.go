@@ -23,10 +23,14 @@ func InitDB() error {
 	password := getEnvRequired("DB_PASSWORD")
 	dbname := getEnvRequired("DB_NAME")
 	port := getEnvRequired("DB_PORT")
+	sslMode := os.Getenv("DB_SSL_MODE")
+	if sslMode == "" {
+		sslMode = "disable" // Default to disable for local development
+	}
 
 	// Connection string
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		host, user, password, dbname, port)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC",
+		host, user, password, dbname, port, sslMode)
 
 	// Configure GORM
 	gormConfig := &gorm.Config{
