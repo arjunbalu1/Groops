@@ -1,13 +1,15 @@
 module groops
 
-go 1.21
+go 1.23.0
+
+toolchain go1.24.2
 
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	golang.org/x/oauth2 v0.30.0
-	google.golang.org/api v0.231.0
+	google.golang.org/api v0.232.0
 	googlemaps.github.io/maps v1.7.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.26.0
