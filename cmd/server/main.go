@@ -10,6 +10,7 @@ import (
 	"groops/internal/handlers"
 	"groops/internal/services"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -55,6 +56,15 @@ func main() {
 
 	// Configure trusted proxies
 	router.SetTrustedProxies([]string{"127.0.0.1"})
+
+	// CORS Middleware Configuration
+	// remove and test later if cross origin request fail
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:3000"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	config.AllowCredentials = true
+	router.Use(cors.New(config))
 
 	// Public routes
 	router.GET("/", handlers.HomeHandler)
