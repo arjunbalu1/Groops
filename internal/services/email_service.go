@@ -71,45 +71,38 @@ func (s *EmailService) SendMemberRemovalEmail(userEmail, userName, groupName str
 // SendEventReminderToGroup sends event reminders to all members in a group
 func (s *EmailService) SendEventReminderToGroup(group models.Group, members []models.Account, reminderType string) error {
 	from := mail.NewEmail(s.fromName, s.fromEmail)
-	message := mail.NewV3Mail()
-	message.SetFrom(from)
 
-	// Set template ID - you'll need to create this in SendGrid
-	// For now, we'll use dynamic content without a template
+	// Simple subject based on reminder type
+	subject := ""
 	if reminderType == "24hour" {
-		message.Subject = fmt.Sprintf("Reminder: %s is tomorrow", group.Name)
+		subject = fmt.Sprintf("Reminder: %s is tomorrow", group.Name)
 	} else {
-		message.Subject = fmt.Sprintf("Reminder: %s starts in 1 hour", group.Name)
+		subject = fmt.Sprintf("Reminder: %s starts in 1 hour", group.Name)
 	}
 
-	// Add each member with personalization
+	// Send individual emails to each member
 	for _, member := range members {
-		personalization := mail.NewPersonalization()
 		to := mail.NewEmail(member.Username, member.Email)
-		personalization.AddTos(to)
 
-		// Add custom fields for dynamic content
-		personalization.SetDynamicTemplateData("username", member.Username)
-		personalization.SetDynamicTemplateData("group_name", group.Name)
-		personalization.SetDynamicTemplateData("event_time", group.DateTime.Format("Mon Jan 2, 3:04 PM"))
-		personalization.SetDynamicTemplateData("location_name", group.Location.Name)
+		// Use direct string formatting instead of template variables
+		plainContent := fmt.Sprintf("Hello %s, Your event %s is coming up soon at %s at %s. Don't miss it!",
+			member.Username, group.Name, group.DateTime.Format("Mon Jan 2, 3:04 PM"), group.Location.Name)
 
-		message.AddPersonalizations(personalization)
-	}
+		htmlContent := fmt.Sprintf("<p>Hello %s,</p><p>Your event <strong>%s</strong> is coming up soon at %s at %s.</p><p>Don't miss it!</p>",
+			member.Username, group.Name, group.DateTime.Format("Mon Jan 2, 3:04 PM"), group.Location.Name)
 
-	// For dynamic content without a template
-	// You should really create a template in SendGrid and use the template ID above
-	content := mail.NewContent("text/html", "<p>Hello {{username}},</p><p>Your event <strong>{{group_name}}</strong> is coming up soon at {{event_time}} at {{location_name}}.</p><p>Don't miss it!</p>")
-	message.AddContent(content)
+		// Create a simple email without template variables
+		message := mail.NewSingleEmail(from, subject, to, plainContent, htmlContent)
 
-	// Single API call for the entire group
-	response, err := s.client.Send(message)
-	if err != nil {
-		return err
-	}
+		// Send email
+		response, err := s.client.Send(message)
+		if err != nil {
+			return err
+		}
 
-	if response.StatusCode >= 400 {
-		return fmt.Errorf("failed to send emails: %d", response.StatusCode)
+		if response.StatusCode >= 400 {
+			return fmt.Errorf("failed to send email to %s: %d", member.Email, response.StatusCode)
+		}
 	}
 
 	return nil
