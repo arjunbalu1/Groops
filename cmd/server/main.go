@@ -54,6 +54,21 @@ func main() {
 	// Initialize Gin router
 	router := gin.Default()
 
+	// Print current working directory to debug template path issues
+	currentDir, _ := os.Getwd()
+	log.Printf("Current working directory: %s", currentDir)
+
+	// List files in various potential template directories for debugging
+	log.Printf("Checking template directories...")
+
+	// Check ./internal/templates
+	files, _ := os.ReadDir("./internal/templates")
+	log.Printf("Files in ./internal/templates: %v", getFileNames(files))
+
+	// Check /app/internal/templates
+	files, _ = os.ReadDir("/app/internal/templates")
+	log.Printf("Files in /app/internal/templates: %v", getFileNames(files))
+
 	// Load HTML templates
 	router.LoadHTMLGlob("internal/templates/*.html")
 
@@ -126,4 +141,16 @@ func main() {
 	if err := router.Run(":" + port); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// getFileNames is a helper function to extract file names from a directory listing
+func getFileNames(files []os.DirEntry) []string {
+	if files == nil {
+		return []string{"<directory not found>"}
+	}
+	names := make([]string, 0, len(files))
+	for _, file := range files {
+		names = append(names, file.Name())
+	}
+	return names
 }
