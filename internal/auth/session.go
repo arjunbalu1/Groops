@@ -45,15 +45,8 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 	// Get database connection
 	db := database.GetDB()
 
-	// Get real client IP from headers
+	// Get real client IP using Gin's built-in method
 	clientIP := c.ClientIP()
-	if forwardedFor := c.GetHeader("X-Forwarded-For"); forwardedFor != "" {
-		// Get the first IP in the chain
-		ips := strings.Split(forwardedFor, ",")
-		if len(ips) > 0 {
-			clientIP = strings.TrimSpace(ips[0])
-		}
-	}
 
 	// Create a new session with user info
 	session := models.Session{

@@ -74,7 +74,7 @@ func main() {
 	}
 
 	// Configure trusted proxies
-	router.SetTrustedProxies([]string{"127.0.0.1"})
+	router.SetTrustedProxies(nil) // Trust all proxies for Railway deployment
 
 	// CORS Middleware Configuration
 	// remove and test later if cross origin request fail
@@ -142,16 +142,4 @@ func main() {
 	if err := router.Run(":" + port); err != nil {
 		log.Fatal(err)
 	}
-}
-
-// getFileNames is a helper function to extract file names from a directory listing
-func getFileNames(files []os.DirEntry) []string {
-	if files == nil {
-		return []string{"<directory not found>"}
-	}
-	names := make([]string, 0, len(files))
-	for _, file := range files {
-		names = append(names, file.Name())
-	}
-	return names
 }
