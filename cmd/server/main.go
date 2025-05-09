@@ -54,23 +54,15 @@ func main() {
 	// Initialize Gin router
 	router := gin.Default()
 
-	// Print current working directory to debug template path issues
-	currentDir, _ := os.Getwd()
-	log.Printf("Current working directory: %s", currentDir)
+	// Load HTML templates based on environment (GIN_MODE)
+	templatePath := "internal/templates/*.html" // Default for local development
+	if gin.Mode() == gin.ReleaseMode {
+		// We're in production/deployment (Railway)
+		templatePath = "/app/internal/templates/*.html"
+	}
 
-	// List files in various potential template directories for debugging
-	log.Printf("Checking template directories...")
-
-	// Check ./internal/templates
-	files, _ := os.ReadDir("./internal/templates")
-	log.Printf("Files in ./internal/templates: %v", getFileNames(files))
-
-	// Check /app/internal/templates
-	files, _ = os.ReadDir("/app/internal/templates")
-	log.Printf("Files in /app/internal/templates: %v", getFileNames(files))
-
-	// Load HTML templates
-	router.LoadHTMLGlob("internal/templates/*.html")
+	log.Printf("Using template path: %s (GIN_MODE: %s)", templatePath, gin.Mode())
+	router.LoadHTMLGlob(templatePath)
 
 	// Configure trusted proxies
 	router.SetTrustedProxies([]string{"127.0.0.1"})

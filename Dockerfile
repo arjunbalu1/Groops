@@ -24,6 +24,9 @@ WORKDIR /app
 # Copy the built binary from the builder
 COPY --from=builder /app/app .
 
+# Copy the templates directory
+COPY --from=builder /app/internal/templates /app/internal/templates
+
 # Set environment variables
 ENV GIN_MODE=release
 ENV TZ=UTC
