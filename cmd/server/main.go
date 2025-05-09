@@ -64,6 +64,15 @@ func main() {
 	log.Printf("Using template path: %s (GIN_MODE: %s)", templatePath, gin.Mode())
 	router.LoadHTMLGlob(templatePath)
 
+	// Serve static files
+	if gin.Mode() == gin.ReleaseMode {
+		// In production
+		router.Static("/assets", "/app/assets")
+	} else {
+		// In development
+		router.Static("/assets", "./assets")
+	}
+
 	// Configure trusted proxies
 	router.SetTrustedProxies([]string{"127.0.0.1"})
 

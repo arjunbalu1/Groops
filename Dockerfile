@@ -27,6 +27,9 @@ COPY --from=builder /app/app .
 # Copy the templates directory
 COPY --from=builder /app/internal/templates /app/internal/templates
 
+# Copy the assets directory
+COPY --from=builder /app/assets /app/assets
+
 # Set environment variables
 ENV GIN_MODE=release
 ENV TZ=UTC
