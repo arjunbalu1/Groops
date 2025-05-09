@@ -9,6 +9,7 @@ import (
 	"groops/internal/database"
 	"groops/internal/handlers"
 	"groops/internal/services"
+	"groops/internal/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -51,8 +52,26 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Initialize Gin router
-	router := gin.Default()
+	// Initialize Gin router with custom middleware
+	router := gin.New()
+
+	// Add recovery middleware
+	router.Use(gin.Recovery())
+
+	// Add custom logging middleware to show real client IPs
+	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		// Use the utility function for consistent IP extraction
+		clientIP := utils.GetRealClientIP(&gin.Context{Request: param.Request})
+
+		return fmt.Sprintf("[GIN] %s | %d | %v | %s | %s %s\n",
+			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+			param.StatusCode,
+			param.Latency,
+			clientIP,
+			param.Method,
+			param.Path,
+		)
+	}))
 
 	// Load HTML templates based on environment (GIN_MODE)
 	templatePath := "internal/templates/*.html" // Default for local development

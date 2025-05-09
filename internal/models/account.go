@@ -96,6 +96,8 @@ type LoginLog struct {
 	ID         uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Username   string     `gorm:"size:30;not null;index" json:"username"`
 	GoogleID   string     `gorm:"size:128;not null" json:"google_id"`
+	Email      string     `gorm:"size:255" json:"email"`
+	Name       string     `gorm:"size:255" json:"name"`
 	LoginTime  time.Time  `gorm:"not null;index" json:"login_time"`
 	LogoutTime *time.Time `json:"logout_time"` // Nullable - will be null until logout
 	IPAddress  string     `gorm:"size:45" json:"ip_address"`

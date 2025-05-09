@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
+	"groops/internal/utils"
 	"net/http"
 	"strings"
 	"time"
@@ -45,8 +46,8 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 	// Get database connection
 	db := database.GetDB()
 
-	// Get real client IP using Gin's built-in method
-	clientIP := c.ClientIP()
+	// Get real client IP using the utility function
+	clientIP := utils.GetRealClientIP(c)
 
 	// Create a new session with user info
 	session := models.Session{
@@ -79,6 +80,8 @@ func CreateSession(c *gin.Context, userInfo *UserInfo, username ...string) error
 	loginLog := models.LoginLog{
 		Username:  session.Username,
 		GoogleID:  userInfo.Sub,
+		Email:     userInfo.Email,
+		Name:      userInfo.Name,
 		LoginTime: time.Now(),
 		IPAddress: clientIP,
 		UserAgent: c.Request.UserAgent(),
