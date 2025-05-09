@@ -55,7 +55,7 @@ func main() {
 	router := gin.Default()
 
 	// Load HTML templates
-	router.LoadHTMLGlob("/Users/arjun/Documents/GroopsApp/Groops/internal/templates/*.html")
+	router.LoadHTMLGlob("internal/templates/*.html")
 
 	// Configure trusted proxies
 	router.SetTrustedProxies([]string{"127.0.0.1"})
