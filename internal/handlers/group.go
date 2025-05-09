@@ -587,7 +587,7 @@ func RemoveMember(c *gin.Context) {
 	}
 
 	// Prevent removal if event is happening soon (within 1 hour)
-	if group.DateTime.Sub(time.Now()) < time.Hour {
+	if time.Until(group.DateTime) < time.Hour {
 		log.Printf("Error: Attempted to remove member too close to event time")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot remove members within 1 hour of the event"})
 		return
