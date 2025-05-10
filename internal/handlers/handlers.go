@@ -11,7 +11,7 @@ import (
 
 // HomeHandler handles requests to the root path "/"
 func HomeHandler(c *gin.Context) {
-	c.HTML(http.StatusOK, "home.html", gin.H{})
+	c.String(http.StatusOK, "welcome to groops")
 }
 
 // HealthHandler is a simple health check endpoint

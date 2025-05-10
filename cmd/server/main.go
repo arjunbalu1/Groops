@@ -73,25 +73,6 @@ func main() {
 		)
 	}))
 
-	// Load HTML templates based on environment (GIN_MODE)
-	templatePath := "internal/templates/*.html" // Default for local development
-	if gin.Mode() == gin.ReleaseMode {
-		// We're in production/deployment (Railway)
-		templatePath = "/app/internal/templates/*.html"
-	}
-
-	log.Printf("Using template path: %s (GIN_MODE: %s)", templatePath, gin.Mode())
-	router.LoadHTMLGlob(templatePath)
-
-	// Serve static files
-	if gin.Mode() == gin.ReleaseMode {
-		// In production
-		router.Static("/assets", "/app/assets")
-	} else {
-		// In development
-		router.Static("/assets", "./assets")
-	}
-
 	// Configure trusted proxies
 	router.SetTrustedProxies(nil) // Trust all proxies for Railway deployment
 
