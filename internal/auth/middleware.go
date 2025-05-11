@@ -117,16 +117,10 @@ func HandleGoogleCallback(c *gin.Context) {
 <head>
     <title>Redirecting...</title>
     <script>
-        // Check if cookie exists before redirecting
-        function checkCookieAndRedirect(destination, maxAttempts = 10) {
-            if (document.cookie.includes('session=') || maxAttempts <= 0) {
-                window.location.href = destination;
-            } else {
-                setTimeout(() => checkCookieAndRedirect(destination, maxAttempts - 1), 50);
-            }
-        }
-        // Start checking for cookie with max 10 attempts (total ~500ms)
-        checkCookieAndRedirect('/dashboard');
+        // Simple delay before redirect
+        setTimeout(function() {
+            window.location.href = "/dashboard";
+        }, 500); // 500ms delay
     </script>
 </head>
 <body>
@@ -184,16 +178,10 @@ func HandleGoogleCallback(c *gin.Context) {
 <head>
     <title>Redirecting...</title>
     <script>
-        // Check if cookie exists before redirecting
-        function checkCookieAndRedirect(destination, maxAttempts = 10) {
-            if (document.cookie.includes('session=') || maxAttempts <= 0) {
-                window.location.href = destination;
-            } else {
-                setTimeout(() => checkCookieAndRedirect(destination, maxAttempts - 1), 50);
-            }
-        }
-        // Start checking for cookie with max 10 attempts (total ~500ms)
-        checkCookieAndRedirect('/create-profile');
+        // Simple delay before redirect
+        setTimeout(function() {
+            window.location.href = "/create-profile";
+        }, 500); // 500ms delay
     </script>
 </head>
 <body>
