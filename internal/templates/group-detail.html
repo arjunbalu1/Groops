@@ -268,7 +268,7 @@
                     {{if eq .LoggedInUser .Group.OrganiserID}}
                     <div class="btn btn-full" style="background-color: #e0e0e0; cursor: default;">You are the organizer</div>
                     {{else}}
-                    <a href="/api/groups/{{.Group.ID}}/join" class="btn btn-full">Join Group</a>
+                    <button id="join-group-btn" class="btn btn-full">Join Group</button>
                     {{end}}
                 {{else}}
                 <a href="/auth/login" class="btn btn-full">Login to Join Group</a>
@@ -311,28 +311,83 @@
             return date.toLocaleDateString('en-US', options);
         }
         
-        // Function to initialize Google Map
-        function initMap() {
+        // Modern Google Maps loading using importLibrary
+        let map;
+        let marker;
+
+        // Initialize and load Google Maps API using the recommended approach
+        async function initMap() {
             const lat = parseFloat("{{.Group.Location.Latitude}}");
             const lng = parseFloat("{{.Group.Location.Longitude}}");
-            const location = { lat: lat, lng: lng };
+            const position = { lat: lat, lng: lng };
             
-            const map = new google.maps.Map(document.getElementById("map"), {
+            // Load required libraries
+            const { Map } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+            
+            // Create the map
+            map = new Map(document.getElementById("map"), {
                 zoom: 15,
-                center: location,
+                center: position,
+                mapId: "MAP_ID"
             });
             
-            const marker = new google.maps.Marker({
-                position: location,
+            // Create advanced marker (recommended over the deprecated Marker)
+            marker = new AdvancedMarkerElement({
                 map: map,
+                position: position,
                 title: "{{.Group.Location.Name}}"
             });
         }
     </script>
     
-    <!-- Google Maps API script -->
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key={{.GoogleMapsApiKey}}&callback=initMap">
+    <!-- Google Maps API script with latest loading pattern -->
+    <script>
+        (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+            key: "{{.GoogleMapsApiKey}}",
+            v: "weekly"
+        });
+        
+        // Initialize the map when the page loads
+        window.addEventListener("load", initMap);
+        
+        // Handle join group button click
+        document.addEventListener('DOMContentLoaded', function() {
+            const joinButton = document.getElementById('join-group-btn');
+            if (joinButton) {
+                joinButton.addEventListener('click', function() {
+                    // Show loading state
+                    joinButton.textContent = 'Joining...';
+                    joinButton.disabled = true;
+                    
+                    // Send POST request to join endpoint
+                    fetch('/api/groups/{{.Group.ID}}/join', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'same-origin'
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Success - refresh the page to show updated status
+                            window.location.reload();
+                        } else {
+                            // Handle error
+                            return response.json().then(data => {
+                                throw new Error(data.error || 'Failed to join group');
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        // Reset button state and show error
+                        joinButton.textContent = 'Join Group';
+                        joinButton.disabled = false;
+                        alert('Error: ' + error.message);
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html> 
