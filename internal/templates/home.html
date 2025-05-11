@@ -245,7 +245,11 @@
                 <div class="group-info"><strong>Cost:</strong> ${{.Cost}}</div>
                 <p class="description" data-full-text="{{.Description}}"></p>
                 <div class="member-count">
-                    <span>{{len .Members}}/{{.MaxMembers}} members</span>
+                    <span id="member-count-{{.ID}}" 
+                          data-approved-members="{{range .Members}}{{if eq .Status "approved"}}A{{end}}{{end}}" 
+                          data-max-members="{{.MaxMembers}}">
+                        0/{{.MaxMembers}} members
+                    </span>
                     <a href="/groups/{{.ID}}" class="btn" style="margin: 0; padding: 5px 10px;">View Details</a>
                 </div>
             </div>
@@ -271,6 +275,14 @@
             document.querySelectorAll('.description').forEach(function(element) {
                 const fullText = element.getAttribute('data-full-text');
                 element.textContent = truncateText(fullText, 100);
+            });
+            
+            // Count approved members
+            document.querySelectorAll('[id^="member-count-"]').forEach(function(element) {
+                const approvedString = element.getAttribute('data-approved-members');
+                const maxMembers = element.getAttribute('data-max-members');
+                const approvedCount = approvedString.length;
+                element.textContent = approvedCount + '/' + maxMembers + ' members';
             });
             
             // Set current filter values from URL

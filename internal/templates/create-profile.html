@@ -155,18 +155,18 @@
             </div>
             
             <div class="form-group">
-                <label for="full-name">Full Name</label>
+                <label for="full-name">Full Name <span id="fullname-error" class="field-error"></span></label>
                 <input type="text" id="full-name" name="full-name" value="{{.Name}}">
                 <div class="help-text">Your display name (leave as is to use your Google profile name)</div>
             </div>
             
             <div class="form-group">
-                <label for="bio">Bio</label>
+                <label for="bio">Bio <span id="bio-error" class="field-error"></span></label>
                 <textarea id="bio" name="bio" placeholder="Tell us a bit about yourself..."></textarea>
             </div>
             
             <div class="form-group">
-                <label for="avatar-url">Avatar URL</label>
+                <label for="avatar-url">Avatar URL <span id="avatar-error" class="field-error"></span></label>
                 <input type="text" id="avatar-url" name="avatar-url" value="{{.Picture}}">
                 <div class="help-text">Leave as is to use your Google profile picture, or enter a custom URL</div>
             </div>
@@ -187,15 +187,28 @@
             // Clear all error messages before processing the new submission
             document.getElementById('error-message').style.display = 'none';
             document.getElementById('username-error').textContent = '';
+            document.getElementById('fullname-error').textContent = '';
+            document.getElementById('bio-error').textContent = '';
+            document.getElementById('avatar-error').textContent = '';
             
             const username = document.getElementById('username').value;
             const fullName = document.getElementById('full-name').value;
             const bio = document.getElementById('bio').value;
             const avatarUrl = document.getElementById('avatar-url').value;
             
-            // Basic client-side validation
-            if (!/^[a-zA-Z0-9]{3,30}$/.test(username)) {
-                showError('Username must be 3-30 characters and contain only letters and numbers');
+            // Field-specific client-side validation
+            let isValid = true;
+            
+            // Username validation
+            if (!username) {
+                document.getElementById('username-error').textContent = '(required)';
+                isValid = false;
+            } else if (!/^[a-zA-Z0-9]{3,30}$/.test(username)) {
+                document.getElementById('username-error').textContent = '(must be 3-30 alphanumeric characters)';
+                isValid = false;
+            }
+            
+            if (!isValid) {
                 return;
             }
             
@@ -217,12 +230,37 @@
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(err => {
+                        // Handle field-specific errors
                         if (err.error === "Username already taken") {
                             document.getElementById('username-error').textContent = '(already taken)';
-                            throw new Error(err.error);
+                        } else if (err.error === "Invalid input") {
+                            if (err.field_errors) {
+                                // Display each field error next to the corresponding field
+                                for (const [field, message] of Object.entries(err.field_errors)) {
+                                    switch (field) {
+                                        case "username":
+                                            document.getElementById('username-error').textContent = `(${message})`;
+                                            break;
+                                        case "full_name":
+                                            document.getElementById('fullname-error').textContent = `(${message})`;
+                                            break;
+                                        case "bio":
+                                            document.getElementById('bio-error').textContent = `(${message})`;
+                                            break;
+                                        case "avatar_url":
+                                            document.getElementById('avatar-error').textContent = `(${message})`;
+                                            break;
+                                    }
+                                }
+                            } else {
+                                // If specific fields aren't indicated, show general message
+                                showError("Please check your inputs and try again");
+                            }
                         } else {
-                            throw new Error(err.error || 'Failed to create profile');
+                            // General error
+                            showError(err.error || 'Failed to create profile');
                         }
+                        throw new Error(err.error || 'Failed to create profile');
                     });
                 }
                 return response.json();
@@ -234,7 +272,8 @@
                 }, 1500);
             })
             .catch(error => {
-                showError(error.message || 'An error occurred. Please try again.');
+                // Error is already handled above
+                // This prevents showing the same error twice
             });
         });
         
@@ -245,9 +284,21 @@
             document.getElementById('success-message').style.display = 'none';
         }
         
-        // Clear field errors when user types in the username field
+        // Clear field errors when user types in any input
         document.getElementById('username').addEventListener('input', function() {
             document.getElementById('username-error').textContent = '';
+        });
+        
+        document.getElementById('full-name').addEventListener('input', function() {
+            document.getElementById('fullname-error').textContent = '';
+        });
+        
+        document.getElementById('bio').addEventListener('input', function() {
+            document.getElementById('bio-error').textContent = '';
+        });
+        
+        document.getElementById('avatar-url').addEventListener('input', function() {
+            document.getElementById('avatar-error').textContent = '';
         });
         
         function showSuccess(message) {
