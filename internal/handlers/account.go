@@ -8,6 +8,7 @@ import (
 	"groops/internal/auth"
 	"groops/internal/database"
 	"groops/internal/models"
+	"groops/internal/services"
 
 	"log"
 
@@ -191,6 +192,15 @@ func CreateProfile(c *gin.Context) {
 			log.Printf("Error: Failed to retrieve updated account: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated account"})
 			return
+		}
+
+		// Send welcome email to the user
+		emailSvc := services.NewEmailService()
+		if err := emailSvc.SendWelcomeEmail(email, chosenName); err != nil {
+			log.Printf("Warning: Failed to send welcome email: %v", err)
+			// Non-fatal error - continue with the response
+		} else {
+			log.Printf("Welcome email sent to %s (%s)", chosenName, email)
 		}
 
 		c.JSON(http.StatusCreated, tempAccount)
