@@ -228,9 +228,9 @@
                 return response.json();
             })
             .then(data => {
-                showSuccess('Profile created successfully! Redirecting to dashboard...');
+                showSuccess('Profile created successfully! Redirecting to homepage...');
                 setTimeout(() => {
-                    window.location.href = '/dashboard';
+                    window.location.href = '/';
                 }, 1500);
             })
             .catch(error => {

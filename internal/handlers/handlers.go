@@ -11,7 +11,8 @@ import (
 
 // HomeHandler handles requests to the root path "/"
 func HomeHandler(c *gin.Context) {
-	c.HTML(http.StatusOK, "home.html", gin.H{})
+	// Simply call GetGroups which now handles both HTML and JSON responses
+	GetGroups(c)
 }
 
 // HealthHandler is a simple health check endpoint

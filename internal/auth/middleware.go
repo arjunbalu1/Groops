@@ -129,7 +129,7 @@ func HandleGoogleCallback(c *gin.Context) {
     <script>
         // Simple delay before redirect
         setTimeout(function() {
-            window.location.href = "/dashboard";
+            window.location.href = "/";
         }, 500); // 500ms delay
     </script>
 </head>

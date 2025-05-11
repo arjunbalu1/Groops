@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Group.Name}} | Groops</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+    <link rel="manifest" href="/assets/site.webmanifest">
+    <link rel="shortcut icon" href="/assets/favicon.ico">
+    
+    <!-- Meta tags for SEO and link previews -->
+    <meta name="description" content="{{.Group.Name}} - Join this {{.Group.ActivityType}} activity on Groops">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .header {
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px 0;
+            text-align: center;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #666;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .group-header {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .group-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .group-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        .group-details {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .group-meta {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .group-subtitle {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        .info-item {
+            margin-bottom: 15px;
+        }
+        .info-label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #e8ae4a;
+            color: black;
+            padding: 12px 25px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 20px;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #cc9941;
+        }
+        .btn-secondary {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background-color: #e0e0e0;
+        }
+        .btn-full {
+            display: block;
+            width: 100%;
+        }
+        .description {
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+        .activity-tag {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .activity-sport {
+            background-color: #e2f2ff;
+            color: #0066cc;
+        }
+        .activity-social {
+            background-color: #fff2e2;
+            color: #e67700;
+        }
+        .activity-games {
+            background-color: #e2ffe2;
+            color: #00a651;
+        }
+        .activity-other {
+            background-color: #f2e2ff;
+            color: #8800cc;
+        }
+        .skill-tag {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            background-color: #f2f2f2;
+            color: #555;
+        }
+        .organizer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .member-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .member-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .member-item:last-child {
+            border-bottom: none;
+        }
+        .map-container {
+            width: 100%;
+            height: 300px;
+            background-color: #f2f2f2;
+            border-radius: 8px;
+            margin-top: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>Groops</h1>
+            <div style="text-align: center; margin-top: 10px;">
+                {{if .IsLoggedIn}}
+                <span style="margin-right: 10px;">Hello, {{.LoggedInUser}}</span>
+                <a href="/auth/logout" class="btn" style="margin: 0 5px;">Logout</a>
+                <a href="/profile" class="btn" style="margin: 0 5px;">My Profile</a>
+                {{else}}
+                <a href="/auth/login" class="btn">Sign In</a>
+                {{end}}
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <a href="/" class="back-link">← Back to all groups</a>
+        
+        <div class="group-header">
+            <span class="activity-tag activity-{{.Group.ActivityType}}">{{.Group.ActivityType}}</span>
+            <span class="skill-tag">{{.Group.SkillLevel}}</span>
+            <h1>{{.Group.Name}}</h1>
+            <div class="group-subtitle">
+                <span id="group-datetime" data-datetime="{{.Group.DateTime}}"></span>
+                at {{.Group.Location.Name}}
+            </div>
+        </div>
+        
+        <div class="group-content">
+            <div class="group-details">
+                <h2>About this event</h2>
+                <div class="description">{{.Group.Description}}</div>
+                
+                <h2>Location</h2>
+                <div class="info-item">
+                    <div class="info-label">Venue</div>
+                    <div>{{.Group.Location.Name}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Address</div>
+                    <div>{{.Group.Location.FormattedAddress}}</div>
+                </div>
+                
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+                
+                <div class="organizer">
+                    <h2>Organized by</h2>
+                    <div class="info-item">
+                        <div class="info-label">Username</div>
+                        <div>{{.Organiser.Username}}</div>
+                    </div>
+                    {{if .Organiser.Bio}}
+                    <div class="info-item">
+                        <div class="info-label">Bio</div>
+                        <div>{{.Organiser.Bio}}</div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            
+            <div class="group-meta">
+                <div class="info-item">
+                    <div class="info-label">Date & Time</div>
+                    <div id="meta-datetime" data-datetime="{{.Group.DateTime}}"></div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Cost</div>
+                    <div>${{.Group.Cost}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Members</div>
+                    <div>{{.ApprovedMemberCount}} / {{.Group.MaxMembers}}</div>
+                </div>
+                
+                {{if .IsLoggedIn}}
+                    {{if eq .LoggedInUser .Group.OrganiserID}}
+                    <div class="btn btn-full" style="background-color: #e0e0e0; cursor: default;">You are the organizer</div>
+                    {{else}}
+                    <a href="/api/groups/{{.Group.ID}}/join" class="btn btn-full">Join Group</a>
+                    {{end}}
+                {{else}}
+                <a href="/auth/login" class="btn btn-full">Login to Join Group</a>
+                {{end}}
+                
+                <h3>Members</h3>
+                <ul class="member-list">
+                    {{range .ApprovedMembers}}
+                    <li class="member-item">{{.Username}}</li>
+                    {{else}}
+                    <li class="member-item">No members yet</li>
+                    {{end}}
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Format dates
+        document.addEventListener('DOMContentLoaded', function() {
+            // Format dates on the page
+            const elements = document.querySelectorAll('[data-datetime]');
+            
+            elements.forEach(function(element) {
+                const datetime = new Date(element.getAttribute('data-datetime'));
+                element.textContent = formatDate(datetime);
+            });
+        });
+        
+        // Helper function to format dates nicely
+        function formatDate(date) {
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric'
+            };
+            return date.toLocaleDateString('en-US', options);
+        }
+        
+        // Function to initialize Google Map
+        function initMap() {
+            const lat = parseFloat("{{.Group.Location.Latitude}}");
+            const lng = parseFloat("{{.Group.Location.Longitude}}");
+            const location = { lat: lat, lng: lng };
+            
+            const map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 15,
+                center: location,
+            });
+            
+            const marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                title: "{{.Group.Location.Name}}"
+            });
+        }
+    </script>
+    
+    <!-- Google Maps API script -->
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key={{.GoogleMapsApiKey}}&callback=initMap">
+    </script>
+</body>
+</html> 

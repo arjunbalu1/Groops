@@ -108,6 +108,10 @@ func main() {
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
 
+	// Public group routes
+	router.GET("/groups", handlers.GetGroups)
+	router.GET("/groups/:group_id", handlers.GetGroupByID)
+
 	// Auth routes
 	router.GET("/auth/login", handlers.LoginHandler)
 	router.GET("/auth/google/callback", handlers.GoogleCallbackHandler)
@@ -133,8 +137,6 @@ func main() {
 
 		// Group routes
 		api.POST("/groups", handlers.CreateGroup)
-		api.GET("/groups", handlers.GetGroups)
-		api.GET("/groups/:group_id", handlers.GetGroupByID)
 		api.POST("/groups/:group_id/join", handlers.JoinGroup)
 		api.POST("/groups/:group_id/leave", handlers.LeaveGroup)
 

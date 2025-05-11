@@ -29,21 +29,20 @@
             line-height: 1.6;
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             background-color: #f5f5f5;
         }
-        .container {
-            max-width: 800px;
-            padding: 20px;
-            text-align: center;
+        .header {
             background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px 0;
+            text-align: center;
         }
-        h1 {
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
             color: #333;
         }
         p {
@@ -63,15 +62,264 @@
         .btn:hover {
             background-color: #cc9941;
         }
+        .filters {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .groups {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .group-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .group-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .group-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .group-info {
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .activity-type {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-right: 5px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+        .activity-sport {
+            background-color: #e2f2ff;
+            color: #0066cc;
+        }
+        .activity-social {
+            background-color: #fff2e2;
+            color: #e67700;
+        }
+        .activity-games {
+            background-color: #e2ffe2;
+            color: #00a651;
+        }
+        .activity-other {
+            background-color: #f2e2ff;
+            color: #8800cc;
+        }
+        .skill-level {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-right: 5px;
+            font-size: 0.8rem;
+        }
+        .skill-beginner {
+            background-color: #f2f2f2;
+            color: #555;
+        }
+        .skill-intermediate {
+            background-color: #f2f2f2;
+            color: #555;
+        }
+        .skill-advanced {
+            background-color: #f2f2f2;
+            color: #555;
+        }
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .filter-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        select, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .buttons {
+            text-align: center;
+            margin-top: 10px;
+        }
+        @media (max-width: 768px) {
+            .groups {
+                grid-template-columns: 1fr;
+            }
+        }
+        .member-count {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        .date-time {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="header">
         <h1>Welcome to Groops!</h1>
         <p>A platform for connecting people through group activities and events.</p>
         <div>
+            {{if .IsLoggedIn}}
+            <span style="margin-right: 10px;">Hello, {{.LoggedInUser}}</span>
+            <a href="/auth/logout" class="btn">Logout</a>
+            <a href="/profile" class="btn">My Profile</a>
+            {{else}}
             <a href="/auth/login" class="btn">Sign In</a>
+            {{end}}
         </div>
     </div>
+    
+    <div class="container">
+        <div class="filters">
+            <h2>Find Groups</h2>
+            <form id="filter-form" action="/" method="get">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label for="activity_type">Activity Type</label>
+                        <select id="activity_type" name="activity_type">
+                            <option value="">All Activities</option>
+                            <option value="sport">Sport</option>
+                            <option value="social">Social</option>
+                            <option value="games">Games</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label for="skill_level">Skill Level</label>
+                        <select id="skill_level" name="skill_level">
+                            <option value="">Any Skill Level</option>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label for="date_from">Date From</label>
+                        <input type="date" id="date_from" name="date_from">
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button type="submit" class="btn">Apply Filters</button>
+                    <button type="button" id="reset-btn" class="btn" style="background-color: #f2f2f2; color: #333;">Reset</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="groups">
+            {{range .Groups}}
+            <div class="group-card">
+                <span class="activity-type activity-{{.ActivityType}}">{{.ActivityType}}</span>
+                <span class="skill-level skill-{{.SkillLevel}}">{{.SkillLevel}}</span>
+                <h3 class="group-title">{{.Name}}</h3>
+                <div class="date-time" data-datetime="{{.DateTime}}"></div>
+                <div class="group-info"><strong>Location:</strong> {{.Location.Name}}</div>
+                <div class="group-info"><strong>Cost:</strong> ${{.Cost}}</div>
+                <p class="description" data-full-text="{{.Description}}"></p>
+                <div class="member-count">
+                    <span>{{len .Members}}/{{.MaxMembers}} members</span>
+                    <a href="/groups/{{.ID}}" class="btn" style="margin: 0; padding: 5px 10px;">View Details</a>
+                </div>
+            </div>
+            {{else}}
+            <div style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                <h3>No groups found</h3>
+                <p>Try adjusting your filters or check back later.</p>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <script>
+        // Format date and truncate text for each group
+        document.addEventListener('DOMContentLoaded', function() {
+            // Format dates
+            document.querySelectorAll('.date-time').forEach(function(element) {
+                const datetime = new Date(element.getAttribute('data-datetime'));
+                element.textContent = formatDate(datetime);
+            });
+            
+            // Truncate descriptions
+            document.querySelectorAll('.description').forEach(function(element) {
+                const fullText = element.getAttribute('data-full-text');
+                element.textContent = truncateText(fullText, 100);
+            });
+            
+            // Set current filter values from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Set activity type
+            const activityType = urlParams.get('activity_type');
+            if (activityType) {
+                document.getElementById('activity_type').value = activityType;
+            }
+            
+            // Set skill level
+            const skillLevel = urlParams.get('skill_level');
+            if (skillLevel) {
+                document.getElementById('skill_level').value = skillLevel;
+            }
+            
+            // Set date from
+            const dateFrom = urlParams.get('date_from');
+            if (dateFrom) {
+                document.getElementById('date_from').value = dateFrom;
+            }
+            
+            // Reset button
+            document.getElementById('reset-btn').addEventListener('click', function() {
+                window.location.href = '/';
+            });
+        });
+        
+        // Helper function to format dates nicely
+        function formatDate(date) {
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric'
+            };
+            return date.toLocaleDateString('en-US', options);
+        }
+        
+        // Helper function to truncate text
+        function truncateText(text, maxLength) {
+            if (text.length <= maxLength) {
+                return text;
+            }
+            return text.substring(0, maxLength) + '...';
+        }
+    </script>
 </body>
 </html> 
