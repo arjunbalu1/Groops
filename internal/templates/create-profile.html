@@ -177,6 +177,10 @@
         document.getElementById('profile-form').addEventListener('submit', function(e) {
             e.preventDefault();
             
+            // Clear all error messages before processing the new submission
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('username-error').textContent = '';
+            
             const username = document.getElementById('username').value;
             const fullName = document.getElementById('full-name').value;
             const bio = document.getElementById('bio').value;
