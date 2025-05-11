@@ -42,7 +42,7 @@ func InitDB() error {
 
 	// Create base logger
 	baseLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		log.New(os.Stdout, "\r\n", log.LstdFlags|log.Lshortfile),
 		logger.Config{
 			SlowThreshold:             time.Second, // Log queries slower than 1 second
 			LogLevel:                  logger.Info, // Keep logging all SQL queries

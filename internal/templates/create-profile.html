@@ -119,6 +119,12 @@
             color: #888;
             margin-top: 5px;
         }
+        .field-error {
+            color: #d9534f;
+            font-size: 14px;
+            margin-left: 10px;
+            font-weight: normal;
+        }
     </style>
 </head>
 <body>
@@ -136,7 +142,7 @@
         
         <form id="profile-form">
             <div class="form-group">
-                <label for="username">Username*</label>
+                <label for="username">Username* <span id="username-error" class="field-error"></span></label>
                 <input type="text" id="username" name="username" required>
                 <div class="help-text">Choose a unique username (3-30 characters, letters and numbers only)</div>
             </div>
@@ -200,7 +206,12 @@
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(err => {
-                        throw new Error(err.error || 'Failed to create profile');
+                        if (err.error === "Username already taken") {
+                            document.getElementById('username-error').textContent = '(already taken)';
+                            throw new Error(err.error);
+                        } else {
+                            throw new Error(err.error || 'Failed to create profile');
+                        }
                     });
                 }
                 return response.json();
@@ -222,6 +233,11 @@
             errorElement.style.display = 'block';
             document.getElementById('success-message').style.display = 'none';
         }
+        
+        // Clear field errors when user types in the username field
+        document.getElementById('username').addEventListener('input', function() {
+            document.getElementById('username-error').textContent = '';
+        });
         
         function showSuccess(message) {
             const successElement = document.getElementById('success-message');

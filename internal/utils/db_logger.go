@@ -2,6 +2,8 @@ package utils
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -42,8 +44,53 @@ func (l *CustomGormLogger) Trace(ctx context.Context, begin time.Time, fc func()
 		}
 	}
 
-	// If no patterns matched, pass to the original logger
-	l.Interface.Trace(ctx, begin, func() (string, int64) {
+	// Find the caller in the application code by examining the stack
+	callerInfo := findCaller()
+
+	// Create a wrapper function that includes caller information
+	wrappedFC := func() (string, int64) {
+		if callerInfo != "" {
+			return fmt.Sprintf("[Caller: %s] %s", callerInfo, sql), rows
+		}
 		return sql, rows
-	}, err)
+	}
+
+	// If no patterns matched, pass to the original logger with caller info
+	l.Interface.Trace(ctx, begin, wrappedFC, err)
+}
+
+// findCaller looks through the call stack to find the first non-GORM, non-database caller
+func findCaller() string {
+	// Start from a depth that skips immediate callers (GORM internals)
+	for i := 2; i < 10; i++ {
+		pc, file, line, ok := runtime.Caller(i)
+		if !ok {
+			break
+		}
+
+		// Skip GORM internal packages and our own database package
+		if strings.Contains(file, "gorm.io") ||
+			strings.Contains(file, "internal/database") ||
+			strings.Contains(file, "internal/utils/db_logger.go") {
+			continue
+		}
+
+		// Get function name if possible
+		funcName := ""
+		if fn := runtime.FuncForPC(pc); fn != nil {
+			funcName = fn.Name()
+			// Extract just the function name without the full package path
+			if idx := strings.LastIndexByte(funcName, '.'); idx != -1 {
+				funcName = funcName[idx+1:]
+			}
+		}
+
+		// Return a descriptive caller string
+		if funcName != "" {
+			return fmt.Sprintf("%s() at %s:%d", funcName, file, line)
+		}
+		return fmt.Sprintf("%s:%d", file, line)
+	}
+
+	return ""
 }
