@@ -103,17 +103,25 @@ func CreateProfile(c *gin.Context) {
 	now := time.Now()
 
 	if accountExists && isTemp {
+		// Store the old username before updating
+		oldUsername := tempAccount.Username
+
 		// Update the temporary account with the chosen username and other details
 		updates := map[string]interface{}{
 			"username":       req.Username,
 			"bio":            req.Bio,
 			"avatar_url":     avatarURL,
 			"updated_at":     now,
-			"full_name":      name,
+			"full_name":      req.FullName,
 			"given_name":     givenName,
 			"family_name":    familyName,
 			"locale":         locale,
 			"email_verified": emailVerified,
+		}
+
+		// If FullName is not provided, fallback to Google name
+		if req.FullName == "" {
+			updates["full_name"] = name
 		}
 
 		if err := db.Model(&tempAccount).Updates(updates).Error; err != nil {
@@ -122,17 +130,67 @@ func CreateProfile(c *gin.Context) {
 			return
 		}
 
+		// Get the final chosen name (either provided by user or Google default)
+		chosenName := req.FullName
+		if chosenName == "" {
+			chosenName = name
+		}
+
+		// Update all related tables with the new username
+		// This ensures we don't lose relationships when username changes
+
+		// 1. Update group memberships
+		if err := db.Model(&models.GroupMember{}).Where("username = ?", oldUsername).Update("username", req.Username).Error; err != nil {
+			log.Printf("Warning: Failed to update group memberships: %v", err)
+			// Non-fatal error - continue
+		}
+
+		// 2. Update activity logs
+		if err := db.Model(&models.ActivityLog{}).Where("username = ?", oldUsername).Update("username", req.Username).Error; err != nil {
+			log.Printf("Warning: Failed to update activity logs: %v", err)
+			// Non-fatal error - continue
+		}
+
+		// 3. Update notifications
+		if err := db.Model(&models.Notification{}).Where("recipient_username = ?", oldUsername).Update("recipient_username", req.Username).Error; err != nil {
+			log.Printf("Warning: Failed to update notifications: %v", err)
+			// Non-fatal error - continue
+		}
+
+		// 4. Update login logs
+		if err := db.Model(&models.LoginLog{}).Where("username = ?", oldUsername).Update("username", req.Username).Error; err != nil {
+			log.Printf("Warning: Failed to update login logs: %v", err)
+			// Non-fatal error - continue
+		}
+
+		// 4a. Update the name in the login log if it differs from the Google name
+		if chosenName != name {
+			if err := db.Model(&models.LoginLog{}).Where("session_id = ?", sessionID).Update("name", chosenName).Error; err != nil {
+				log.Printf("Warning: Failed to update login log name: %v", err)
+				// Non-fatal error - continue
+			}
+		}
+
+		// 5. Update session directly in the database
+		// Also update the name in the session if it differs from the Google name
+		sessionUpdates := map[string]interface{}{
+			"username": req.Username,
+		}
+		if chosenName != name {
+			sessionUpdates["name"] = chosenName
+		}
+		if err := db.Model(&models.Session{}).Where("id = ?", sessionID).Updates(sessionUpdates).Error; err != nil {
+			log.Printf("Warning: Failed to update session: %v", err)
+			// Non-fatal error - continue
+		} else {
+			log.Printf("Session %s updated with new username: %s and name: %s", sessionID, req.Username, chosenName)
+		}
+
 		// Retrieve the updated account
 		if err := db.Where("google_id = ?", sub).First(&tempAccount).Error; err != nil {
 			log.Printf("Error: Failed to retrieve updated account: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated account"})
 			return
-		}
-
-		// Link the session to the user
-		if err := auth.LinkSessionToUser(sessionID, req.Username); err != nil {
-			// Non-fatal error - log but don't fail the request
-			log.Printf("Warning: Failed to link session to user: %v", err)
 		}
 
 		c.JSON(http.StatusCreated, tempAccount)

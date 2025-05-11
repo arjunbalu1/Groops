@@ -67,6 +67,7 @@ func (a *Account) BeforeSave(tx *gorm.DB) error {
 // CreateAccountRequest represents the data needed to create a new account
 type CreateAccountRequest struct {
 	Username  string `json:"username" binding:"required,alphanum,min=3,max=30"`
+	FullName  string `json:"full_name"`
 	Bio       string `json:"bio"`
 	AvatarURL string `json:"avatar_url"`
 }

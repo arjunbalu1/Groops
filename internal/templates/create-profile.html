@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Your Groops Profile</title>
+    
+    <meta name="description" content="Set up your profile on Groops - connect with people through group activities and events.">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+            padding: 20px 0;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 30px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #e8ae4a;
+            color: black;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px 0;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #cc9941;
+        }
+        .buttons {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .error-message {
+            color: #d9534f;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .success-message {
+            color: #5cb85c;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .google-info {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+        }
+        .google-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+        .google-text {
+            flex: 1;
+        }
+        .google-text p {
+            margin: 5px 0;
+            text-align: left;
+        }
+        .help-text {
+            font-size: 14px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Create Your Groops Profile</h1>
+        <p>Complete your profile to start joining and creating groups!</p>
+        
+        <div class="google-info">
+            <img src="{{.Picture}}" alt="Profile Picture" class="google-avatar">
+            <div class="google-text">
+                <p><strong>Name:</strong> {{.Name}}</p>
+                <p><strong>Email:</strong> {{.Email}}</p>
+            </div>
+        </div>
+        
+        <form id="profile-form">
+            <div class="form-group">
+                <label for="username">Username*</label>
+                <input type="text" id="username" name="username" required>
+                <div class="help-text">Choose a unique username (3-30 characters, letters and numbers only)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="full-name">Full Name</label>
+                <input type="text" id="full-name" name="full-name" value="{{.Name}}">
+                <div class="help-text">Your display name (leave as is to use your Google profile name)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="bio">Bio</label>
+                <textarea id="bio" name="bio" placeholder="Tell us a bit about yourself..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="avatar-url">Avatar URL</label>
+                <input type="text" id="avatar-url" name="avatar-url" value="{{.Picture}}">
+                <div class="help-text">Leave as is to use your Google profile picture, or enter a custom URL</div>
+            </div>
+            
+            <div class="buttons">
+                <button type="submit" class="btn">Create Profile</button>
+            </div>
+            
+            <div id="error-message" class="error-message"></div>
+            <div id="success-message" class="success-message"></div>
+        </form>
+    </div>
+    
+    <script>
+        document.getElementById('profile-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const fullName = document.getElementById('full-name').value;
+            const bio = document.getElementById('bio').value;
+            const avatarUrl = document.getElementById('avatar-url').value;
+            
+            // Basic client-side validation
+            if (!/^[a-zA-Z0-9]{3,30}$/.test(username)) {
+                showError('Username must be 3-30 characters and contain only letters and numbers');
+                return;
+            }
+            
+            const data = {
+                username: username,
+                full_name: fullName,
+                bio: bio,
+                avatar_url: avatarUrl
+            };
+            
+            fetch('/api/profile/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data),
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Failed to create profile');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                showSuccess('Profile created successfully! Redirecting to dashboard...');
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 1500);
+            })
+            .catch(error => {
+                showError(error.message || 'An error occurred. Please try again.');
+            });
+        });
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+        
+        function showSuccess(message) {
+            const successElement = document.getElementById('success-message');
+            successElement.textContent = message;
+            successElement.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 

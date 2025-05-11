@@ -240,11 +240,3 @@ func VerifyOAuthState(c *gin.Context, receivedState string) bool {
 	// Verify the state
 	return savedState == receivedState
 }
-
-// LinkSessionToUser links a session to a registered user
-func LinkSessionToUser(sessionID, username string) error {
-	db := database.GetDB()
-	return db.Model(&models.Session{}).
-		Where("id = ?", sessionID).
-		Update("username", username).Error
-}

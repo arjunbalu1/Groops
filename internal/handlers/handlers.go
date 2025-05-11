@@ -64,5 +64,10 @@ func CreateProfilePageHandler(c *gin.Context) {
 	email := c.GetString("email")
 	name := c.GetString("name")
 	picture := c.GetString("picture")
-	c.String(http.StatusOK, "Create your profile. Suggested email: %s, name: %s, picture: %s", email, name, picture)
+
+	c.HTML(http.StatusOK, "create-profile.html", gin.H{
+		"Email":   email,
+		"Name":    name,
+		"Picture": picture,
+	})
 }
