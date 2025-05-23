@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"groops/internal/database"
 	"groops/internal/models"
+	"groops/internal/services"
 	"net/http"
 	"os"
 	"strings"
@@ -96,6 +97,15 @@ func HandleGoogleCallback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to extract user info from token"})
 		c.Abort()
 		return
+	}
+
+	// Send admin notification for successful OAuth login
+	emailSvc := services.NewEmailService()
+	if err := emailSvc.SendAdminOAuthNotification(userInfo.Email, userInfo.Name); err != nil {
+		// Just log the error, don't stop the authentication flow
+		fmt.Printf("Warning: Failed to send admin OAuth notification: %v\n", err)
+	} else {
+		fmt.Printf("Admin notification sent for OAuth login: %s (%s)\n", userInfo.Name, userInfo.Email)
 	}
 
 	// Check if user already exists

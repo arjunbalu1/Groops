@@ -29,6 +29,37 @@ func NewEmailService() *EmailService {
 	}
 }
 
+// SendWelcomeEmail sends a welcome email to users who register a username
+func (s *EmailService) SendWelcomeEmail(userEmail, userName string) error {
+	from := mail.NewEmail(s.fromName, s.fromEmail)
+	to := mail.NewEmail(userName, userEmail)
+	subject := "Welcome to Groops!"
+	plainContent := fmt.Sprintf("Hello %s, Welcome to Groops! We're excited to have you join our community. Start exploring groups and activities now!", userName)
+	htmlContent := fmt.Sprintf("<p>Hello <strong>%s</strong>,</p><p>Welcome to <strong>Groops</strong>! We're excited to have you join our community.</p><p>Start exploring groups and activities now!</p>", userName)
+
+	message := mail.NewSingleEmail(from, subject, to, plainContent, htmlContent)
+	_, err := s.client.Send(message)
+	return err
+}
+
+// SendAdminOAuthNotification notifies admin when someone completes OAuth login
+func (s *EmailService) SendAdminOAuthNotification(userEmail, userName string) error {
+	adminEmail := os.Getenv("ADMIN_NOTIFICATION_EMAIL")
+	if adminEmail == "" {
+		return fmt.Errorf("ADMIN_NOTIFICATION_EMAIL environment variable not set")
+	}
+
+	from := mail.NewEmail(s.fromName, s.fromEmail)
+	to := mail.NewEmail("Admin", adminEmail)
+	subject := "New OAuth Login on Groops"
+	plainContent := fmt.Sprintf("A new user has completed OAuth login: %s (%s)", userName, userEmail)
+	htmlContent := fmt.Sprintf("<p>A new user has completed OAuth login:</p><p><strong>Name:</strong> %s</p><p><strong>Email:</strong> %s</p>", userName, userEmail)
+
+	message := mail.NewSingleEmail(from, subject, to, plainContent, htmlContent)
+	_, err := s.client.Send(message)
+	return err
+}
+
 // SendJoinRequestEmail notifies group owner of new join request
 func (s *EmailService) SendJoinRequestEmail(ownerEmail, ownerName, requesterName, groupName string) error {
 	from := mail.NewEmail(s.fromName, s.fromEmail)

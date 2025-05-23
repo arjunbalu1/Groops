@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"groops/internal/models"
+	"groops/internal/utils"
 	"log"
 	"os"
 	"time"
@@ -39,17 +40,26 @@ func InitDB() error {
 			host, user, password, dbname, port, sslMode)
 	}
 
+	// Create base logger
+	baseLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags|log.Lshortfile),
+		logger.Config{
+			SlowThreshold:             time.Second, // Log queries slower than 1 second
+			LogLevel:                  logger.Info, // Keep logging all SQL queries
+			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
+			Colorful:                  true,        // Enable color
+		},
+	)
+
+	// Create custom logger that filters specific queries
+	customLogger := utils.NewCustomGormLogger(
+		baseLogger,
+		"SELECT * FROM \"group\" WHERE date_time >", // Filter reminder worker query
+	)
+
 	// Configure GORM
 	gormConfig := &gorm.Config{
-		Logger: logger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			logger.Config{
-				SlowThreshold:             time.Second, // Log queries slower than 1 second
-				LogLevel:                  logger.Info, // Log all SQL queries
-				IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
-				Colorful:                  true,        // Enable color
-			},
-		),
+		Logger: customLogger,
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true, // Use singular table names
 		},

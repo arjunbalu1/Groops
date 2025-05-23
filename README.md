@@ -1,6 +1,6 @@
 # Groops 🌍
-hehe
-**The app is live at [https://groops.fun](https://groops.fun)**
+
+**The app is live at [https://groops.fun](https://groops.fun) hehe**
 
 All API calls should use the base URL: `https://groops.fun`
 
@@ -190,6 +190,13 @@ GOOGLE_REDIRECT_URL=http://localhost:8080/auth/google/callback
 # Google Maps API
 GOOGLE_MAPS_API_KEY=your-maps-api-key
 
+# Email (SendGrid)
+SENDGRID_API_KEY=your-sendgrid-api-key
+SENDGRID_NOTIFICATIONS_FROM_EMAIL=notifications@yourdomain.com
+SENDGRID_FROM_NAME=Groops
+
+# Admin Notifications
+ADMIN_NOTIFICATION_EMAIL=your-email@example.com
 ```
 
 To set up Google Maps:

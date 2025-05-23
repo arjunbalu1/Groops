@@ -3,11 +3,13 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"groops/internal/auth"
 	"groops/internal/database"
 	"groops/internal/models"
 	"groops/internal/services"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -95,10 +97,23 @@ func CreateGroup(c *gin.Context) {
 }
 
 // GetGroups handles listing all groups with filtering, sorting, and pagination.
-// Don't know what's going on here with sort parameter validation and numeric type conversion, but it's SQL injection safe.
+// Can respond with either JSON or HTML based on Accept header
 func GetGroups(c *gin.Context) {
 	db := database.GetDB()
 	var groups []models.Group
+
+	// For HTML response, check login status
+	isLoggedIn := false
+	var username string
+
+	// Get login info if HTML response is expected
+	if c.GetHeader("Accept") != "application/json" {
+		session, err := auth.GetSession(c)
+		if err == nil && session != nil {
+			isLoggedIn = true
+			username = session.Username
+		}
+	}
 
 	query := db.Preload("Members")
 
@@ -136,6 +151,11 @@ func GetGroups(c *gin.Context) {
 		}
 	}
 
+	// For homepage, only show future groups
+	if c.Request.URL.Path == "/" {
+		query = query.Where("date_time >= ?", time.Now())
+	}
+
 	// Sorting with validation
 	sortBy := c.DefaultQuery("sort_by", "date_time")
 	// Validate sort column against allowed values
@@ -164,8 +184,12 @@ func GetGroups(c *gin.Context) {
 	if err != nil || limit <= 0 {
 		limit = 10
 	}
-	if limit > 100 {
-		limit = 100 // max limit
+
+	// For homepage, use 12 items
+	if c.Request.URL.Path == "/" {
+		limit = 12
+	} else if limit > 100 {
+		limit = 100 // max limit for API
 	}
 
 	offset, err := strconv.Atoi(offsetStr)
@@ -177,11 +201,31 @@ func GetGroups(c *gin.Context) {
 
 	if err := query.Find(&groups).Error; err != nil {
 		log.Printf("Error: Failed to fetch groups: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch groups"})
+
+		// Respond based on Accept header
+		if c.GetHeader("Accept") == "application/json" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch groups"})
+		} else {
+			c.HTML(http.StatusOK, "home.html", gin.H{
+				"Groups":       []models.Group{},
+				"Error":        "Failed to fetch groups",
+				"LoggedInUser": username,
+				"IsLoggedIn":   isLoggedIn,
+			})
+		}
 		return
 	}
 
-	c.JSON(http.StatusOK, groups)
+	// Respond based on Accept header
+	if c.GetHeader("Accept") == "application/json" {
+		c.JSON(http.StatusOK, groups)
+	} else {
+		c.HTML(http.StatusOK, "home.html", gin.H{
+			"Groups":       groups,
+			"LoggedInUser": username,
+			"IsLoggedIn":   isLoggedIn,
+		})
+	}
 }
 
 // LogActivity adds a new activity to user's history
@@ -533,11 +577,31 @@ func GetGroupByID(c *gin.Context) {
 	groupID := c.Param("group_id")
 	db := database.GetDB()
 
+	// Determine login status and get username
+	isLoggedIn := false
+	var username string
+
+	session, err := auth.GetSession(c)
+	if err == nil && session != nil {
+		isLoggedIn = true
+		username = session.Username
+	}
+
 	var group models.Group
 	// Preload organiser and members
 	if err := db.Preload("Members").Where("id = ?", groupID).First(&group).Error; err != nil {
 		log.Printf("Error: Group not found: %v", err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+
+		// Check if request wants HTML or JSON
+		if c.GetHeader("Accept") == "application/json" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		} else {
+			c.HTML(http.StatusNotFound, "home.html", gin.H{
+				"Error":        "Group not found",
+				"LoggedInUser": username,
+				"IsLoggedIn":   isLoggedIn,
+			})
+		}
 		return
 	}
 
@@ -545,22 +609,55 @@ func GetGroupByID(c *gin.Context) {
 	var organiser models.Account
 	if err := db.Where("username = ?", group.OrganiserID).First(&organiser).Error; err != nil {
 		log.Printf("Error: Failed to fetch organiser info: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch organiser info"})
+
+		if c.GetHeader("Accept") == "application/json" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch organiser info"})
+		} else {
+			c.HTML(http.StatusInternalServerError, "home.html", gin.H{
+				"Error":        "Failed to fetch organiser details",
+				"LoggedInUser": username,
+				"IsLoggedIn":   isLoggedIn,
+			})
+		}
 		return
 	}
 
-	// Prepare response
-	response := gin.H{
-		"group": group,
-		"organiser": gin.H{
-			"username":   organiser.Username,
-			"rating":     organiser.Rating,
-			"avatar_url": organiser.AvatarURL,
-			"bio":        organiser.Bio,
-		},
+	// Get approved members count
+	var approvedMembers []models.GroupMember
+	for _, member := range group.Members {
+		if member.Status == "approved" {
+			approvedMembers = append(approvedMembers, member)
+		}
 	}
 
-	c.JSON(http.StatusOK, response)
+	// Check if request wants HTML or JSON
+	if c.GetHeader("Accept") == "application/json" {
+		// Prepare JSON response
+		response := gin.H{
+			"group": group,
+			"organiser": gin.H{
+				"username":   organiser.Username,
+				"rating":     organiser.Rating,
+				"avatar_url": organiser.AvatarURL,
+				"bio":        organiser.Bio,
+			},
+		}
+		c.JSON(http.StatusOK, response)
+	} else {
+		// Get Google Maps API key from environment for the template
+		googleMapsApiKey := os.Getenv("GOOGLE_MAPS_API_KEY")
+
+		// Render HTML template
+		c.HTML(http.StatusOK, "group-detail.html", gin.H{
+			"Group":               group,
+			"Organiser":           organiser,
+			"ApprovedMembers":     approvedMembers,
+			"ApprovedMemberCount": len(approvedMembers),
+			"GoogleMapsApiKey":    googleMapsApiKey,
+			"LoggedInUser":        username,
+			"IsLoggedIn":          isLoggedIn,
+		})
+	}
 }
 
 // RemoveMember handles the removal of a member from a group by the organizer

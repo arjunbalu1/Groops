@@ -22,6 +22,22 @@ func GetRealClientIP(c *gin.Context) string {
 		}
 	}
 
-	// Fall back to Gin's built-in method
+	// Check if c.Request is available
+	if c.Request != nil {
+		// Try to get IP from RemoteAddr directly
+		if c.Request.RemoteAddr != "" {
+			// RemoteAddr is typically in the format "IP:port"
+			ip := strings.Split(c.Request.RemoteAddr, ":")[0]
+			return ip
+		}
+	}
+
+	// Try ClientIP as a last resort, with panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			// If we panic here, just return a fallback IP
+		}
+	}()
+
 	return c.ClientIP()
 }
