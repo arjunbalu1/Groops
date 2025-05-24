@@ -24,9 +24,6 @@ WORKDIR /app
 # Copy the built binary from the builder
 COPY --from=builder /app/app .
 
-# Copy the templates directory
-COPY --from=builder /app/internal/templates /app/internal/templates
-
 # Copy the assets directory
 COPY --from=builder /app/assets /app/assets
 
