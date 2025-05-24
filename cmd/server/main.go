@@ -76,10 +76,26 @@ func main() {
 	// Configure trusted proxies
 	router.SetTrustedProxies(nil) // Trust all proxies for Railway deployment
 
-	// CORS Middleware Configuration
-	// remove and test later if cross origin request fail
+	// CORS Middleware Configuration - Environment-Based Security
+	var allowedOrigins []string
+
+	if gin.Mode() == gin.DebugMode {
+		// Development: Allow localhost origins
+		allowedOrigins = []string{
+			"http://localhost:5173", // Vite dev server
+			"http://localhost:3000", // Alternative frontend port
+		}
+		log.Println("CORS: Development mode - allowing localhost origins")
+	} else {
+		// Production: Only allow production domains
+		allowedOrigins = []string{
+			"https://groops.fun", // Production frontend only
+		}
+		log.Println("CORS: Production mode - allowing only production origins")
+	}
+
 	config := cors.DefaultConfig()
-	config.AllowAllOrigins = true
+	config.AllowOrigins = allowedOrigins
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	config.AllowCredentials = true
