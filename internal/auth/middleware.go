@@ -119,25 +119,8 @@ func HandleGoogleCallback(c *gin.Context) {
 			return
 		}
 
-		// Instead of immediate redirect, use client-side redirect with a delay
-		c.Header("Content-Type", "text/html")
-		c.String(http.StatusOK, `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Redirecting...</title>
-    <script>
-        // Small delay to ensure cookie is set before redirect
-        setTimeout(function() {
-            window.location.href = "/dashboard";
-        }, 500); // 500ms delay
-    </script>
-</head>
-<body>
-    <p>Completing login, please wait...</p>
-</body>
-</html>
-`)
+		// Redirect to frontend dashboard
+		c.Redirect(http.StatusTemporaryRedirect, "https://groops.fun/dashboard")
 		return
 	}
 
@@ -180,25 +163,8 @@ func HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Instead of immediate redirect, use client-side redirect with a delay
-	c.Header("Content-Type", "text/html")
-	c.String(http.StatusOK, `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Redirecting...</title>
-    <script>
-        // Small delay to ensure cookie is set before redirect
-        setTimeout(function() {
-            window.location.href = "/create-profile";
-        }, 500); // 500ms delay
-    </script>
-</head>
-<body>
-    <p>Completing login, please wait...</p>
-</body>
-</html>
-`)
+	// Redirect to frontend profile creation
+	c.Redirect(http.StatusTemporaryRedirect, "https://groops.fun/create-profile")
 }
 
 // verifyIDToken verifies the ID token using Google's official library
