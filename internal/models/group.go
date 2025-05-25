@@ -8,14 +8,8 @@ import (
 )
 
 // ActivityType represents the type of activity for a group
+// Now accepts any non-empty string value
 type ActivityType string
-
-const (
-	SportActivity  ActivityType = "sport"
-	SocialActivity ActivityType = "social"
-	GamesActivity  ActivityType = "games"
-	OtherActivity  ActivityType = "other"
-)
 
 // SkillLevel represents the required skill level for a group
 type SkillLevel string

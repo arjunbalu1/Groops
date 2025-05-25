@@ -119,8 +119,14 @@ func HandleGoogleCallback(c *gin.Context) {
 			return
 		}
 
-		// Redirect to frontend dashboard
-		c.Redirect(http.StatusTemporaryRedirect, "https://groops.fun/dashboard")
+		// Check if this is a temp user who needs to complete profile
+		if strings.HasPrefix(existingAccount.Username, "temp-") {
+			// Temp user - redirect to profile creation
+			c.Redirect(http.StatusTemporaryRedirect, "https://groops.fun/create-profile")
+		} else {
+			// Complete user - redirect to home page
+			c.Redirect(http.StatusTemporaryRedirect, "https://groops.fun")
+		}
 		return
 	}
 
