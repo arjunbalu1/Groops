@@ -57,16 +57,18 @@ func CreateProfilePageHandler(c *gin.Context) {
 	// Check if user already has a non-temporary profile
 	username := c.GetString("username")
 	if username != "" && !strings.HasPrefix(username, "temp-") {
-		// User already has a permanent profile, redirect to dashboard
-		c.Redirect(http.StatusTemporaryRedirect, "/dashboard")
+		// User already has a permanent profile, redirect to home
+		c.Redirect(http.StatusTemporaryRedirect, "https://groops.fun")
 		return
 	}
 
-	// Show the profile creation form for new users
-	email := c.GetString("email")
-	name := c.GetString("name")
-	picture := c.GetString("picture")
-	c.String(http.StatusOK, "Create your profile. Suggested email: %s, name: %s, picture: %s", email, name, picture)
+	// Return user info for the React app to use
+	c.JSON(http.StatusOK, gin.H{
+		"needsProfile": true,
+		"email":        c.GetString("email"),
+		"name":         c.GetString("name"),
+		"picture":      c.GetString("picture"),
+	})
 }
 
 // GetStats returns platform statistics

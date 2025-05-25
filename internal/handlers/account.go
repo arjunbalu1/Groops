@@ -36,6 +36,12 @@ func GetMyProfile(c *gin.Context) {
 			"error":         "Profile incomplete",
 			"authenticated": true,
 			"needsProfile":  true,
+			"username":      username,
+			"email":         c.GetString("email"),
+			"name":          c.GetString("name"),
+			"picture":       c.GetString("picture"),
+			"given_name":    c.GetString("given_name"),
+			"family_name":   c.GetString("family_name"),
 		})
 		return
 	}
@@ -138,9 +144,9 @@ func CreateProfile(c *gin.Context) {
 
 	db := database.GetDB()
 
-	// Check if username is already taken by someone else
+	// Check if username is already taken by someone else (case-insensitive)
 	var existingUsername models.Account
-	if err := db.Where("username = ? AND google_id != ?", req.Username, sub).First(&existingUsername).Error; err == nil {
+	if err := db.Where("LOWER(username) = LOWER(?) AND google_id != ?", req.Username, sub).First(&existingUsername).Error; err == nil {
 		log.Printf("Error: Username already taken")
 		c.JSON(http.StatusConflict, gin.H{"error": "Username already taken"})
 		return
@@ -405,7 +411,8 @@ func GetPublicProfile(c *gin.Context) {
 
 	db := database.GetDB()
 	var account models.Account
-	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
+	// Use case-insensitive username lookup to prevent duplicate usernames with different cases
+	if err := db.Where("LOWER(username) = LOWER(?)", username).First(&account).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			log.Printf("Error: Account not found: %v", err)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
