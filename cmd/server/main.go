@@ -83,7 +83,6 @@ func main() {
 		// Development: Allow localhost origins
 		allowedOrigins = []string{
 			"http://localhost:5173", // Vite dev server
-			"http://localhost:3000", // Alternative frontend port
 		}
 		log.Println("CORS: Development mode - allowing localhost origins")
 	} else {
@@ -109,6 +108,15 @@ func main() {
 	router.GET("/groups", handlers.GetGroups)
 	router.GET("/groups/:group_id", handlers.GetGroupByID)
 
+	// Public stats route
+	router.GET("/api/stats", handlers.GetStats)
+
+	// Public profile route (safe, limited data only)
+	router.GET("/profiles/:username", handlers.GetPublicProfile)
+
+	// Public profile image proxy (to avoid CORS issues)
+	router.GET("/profiles/:username/image", handlers.GetProfileImage)
+
 	// Auth routes
 	router.GET("/auth/login", handlers.LoginHandler)
 	router.GET("/auth/google/callback", handlers.GoogleCallbackHandler)
@@ -121,6 +129,9 @@ func main() {
 		authPageGroup.GET("/create-profile", handlers.CreateProfilePageHandler)
 		authPageGroup.GET("/dashboard", handlers.DashboardHandler)
 		authPageGroup.POST("/api/profile/register", handlers.CreateProfile)
+
+		// Get current user profile - works for both complete and incomplete profiles
+		authPageGroup.GET("/api/auth/me", handlers.GetMyProfile)
 	}
 
 	// Protected API routes - require authentication with a full user profile

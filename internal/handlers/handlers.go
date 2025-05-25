@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"groops/internal/auth"
+	"groops/internal/database"
+	"groops/internal/models"
 	"log"
 	"net/http"
 	"strings"
@@ -65,4 +67,31 @@ func CreateProfilePageHandler(c *gin.Context) {
 	name := c.GetString("name")
 	picture := c.GetString("picture")
 	c.String(http.StatusOK, "Create your profile. Suggested email: %s, name: %s, picture: %s", email, name, picture)
+}
+
+// GetStats returns platform statistics
+func GetStats(c *gin.Context) {
+	db := database.DB
+
+	var userCount int64
+	var groupCount int64
+
+	// Count total users
+	if err := db.Model(&models.Account{}).Count(&userCount).Error; err != nil {
+		log.Printf("Error counting users: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch statistics"})
+		return
+	}
+
+	// Count total groups
+	if err := db.Model(&models.Group{}).Count(&groupCount).Error; err != nil {
+		log.Printf("Error counting groups: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch statistics"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"users":  userCount,
+		"groups": groupCount,
+	})
 }

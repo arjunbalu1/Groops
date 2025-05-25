@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,6 +16,66 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+// GetMyProfile retrieves the current authenticated user's profile
+func GetMyProfile(c *gin.Context) {
+	username := c.GetString("username")
+
+	// Check if user is authenticated
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":         "Not authenticated",
+			"authenticated": false,
+		})
+		return
+	}
+
+	// Check if user needs to complete profile (temp username)
+	if len(username) > 5 && username[:5] == "temp-" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":         "Profile incomplete",
+			"authenticated": true,
+			"needsProfile":  true,
+		})
+		return
+	}
+
+	// Get full account data
+	db := database.GetDB()
+	var account models.Account
+	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":         "Account not found",
+				"authenticated": false,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":         "Failed to retrieve account",
+			"authenticated": false,
+		})
+		return
+	}
+
+	// Return user profile data
+	c.JSON(http.StatusOK, gin.H{
+		"authenticated": true,
+		"needsProfile":  false,
+		"username":      account.Username,
+		"email":         account.Email,
+		"fullName":      account.FullName,
+		"givenName":     account.GivenName,
+		"familyName":    account.FamilyName,
+		"bio":           account.Bio,
+		"avatarURL":     account.AvatarURL,
+		"rating":        account.Rating,
+		"dateJoined":    account.DateJoined,
+		"lastLogin":     account.LastLogin,
+		"emailVerified": account.EmailVerified,
+		"locale":        account.Locale,
+	})
+}
 
 // GetAccount retrieves account information
 func GetAccount(c *gin.Context) {
@@ -335,4 +396,76 @@ func GetUnreadNotificationCount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"unread_count": count})
+}
+
+// GetPublicProfile retrieves safe, public profile information
+// This endpoint is safe to expose publicly as it only returns non-sensitive data
+func GetPublicProfile(c *gin.Context) {
+	username := c.Param("username")
+
+	db := database.GetDB()
+	var account models.Account
+	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			log.Printf("Error: Account not found: %v", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
+			return
+		}
+		log.Printf("Error: Failed to retrieve account: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve account"})
+		return
+	}
+
+	// Return only safe, public information
+	publicProfile := gin.H{
+		"username":    account.Username,
+		"full_name":   account.FullName,
+		"avatar_url":  account.AvatarURL,
+		"bio":         account.Bio,
+		"rating":      account.Rating,
+		"date_joined": account.DateJoined,
+	}
+
+	c.JSON(http.StatusOK, publicProfile)
+}
+
+// GetProfileImage proxies profile images to avoid CORS issues
+func GetProfileImage(c *gin.Context) {
+	username := c.Param("username")
+
+	db := database.GetDB()
+	var account models.Account
+	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
+		return
+	}
+
+	if account.AvatarURL == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No avatar available"})
+		return
+	}
+
+	// Fetch the image from the external URL
+	resp, err := http.Get(account.AvatarURL)
+	if err != nil {
+		log.Printf("Error fetching image: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch image"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+		return
+	}
+
+	// Set appropriate headers
+	c.Header("Content-Type", resp.Header.Get("Content-Type"))
+	c.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+
+	// Copy the image data to the response
+	_, err = io.Copy(c.Writer, resp.Body)
+	if err != nil {
+		log.Printf("Error copying image data: %v", err)
+	}
 }
