@@ -88,7 +88,7 @@ func main() {
 	} else {
 		// Production: Only allow production domains
 		allowedOrigins = []string{
-			"https://groops.fun", // Production frontend only
+			"https://www.groops.fun", // Production frontend only
 		}
 		log.Println("CORS: Production mode - allowing only production origins")
 	}
