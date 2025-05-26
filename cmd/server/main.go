@@ -145,6 +145,8 @@ func main() {
 
 		// Group routes
 		api.POST("/groups", handlers.CreateGroup)
+		api.PUT("/groups/:group_id", handlers.UpdateGroup)
+		api.DELETE("/groups/:group_id", handlers.DeleteGroup)
 		api.POST("/groups/:group_id/join", handlers.JoinGroup)
 		api.POST("/groups/:group_id/leave", handlers.LeaveGroup)
 

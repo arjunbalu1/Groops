@@ -94,6 +94,157 @@ func CreateGroup(c *gin.Context) {
 	c.JSON(http.StatusCreated, group)
 }
 
+// UpdateGroup handles updating an existing group (organizer only)
+func UpdateGroup(c *gin.Context) {
+	groupID := c.Param("group_id")
+	requester := c.GetString("username")
+
+	var request models.CreateGroupRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Printf("Error: Invalid input: %s", err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid input: %s", err.Error())})
+		return
+	}
+
+	// Validate that DateTime is in the future
+	if request.DateTime.Before(time.Now()) {
+		log.Printf("Error: Event date %v is before current time", request.DateTime)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Event date must be in the future"})
+		return
+	}
+
+	db := database.GetDB()
+
+	// Check if group exists
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		return
+	}
+
+	// Check if requester is the organizer
+	if group.OrganiserID != requester {
+		log.Printf("Error: Only the organizer can update the group")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can update the group"})
+		return
+	}
+
+	// Prevent updates if event is happening soon (within 1 hour)
+	if time.Until(group.DateTime) < time.Hour {
+		log.Printf("Error: Attempted to update group too close to event time")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot update group within 1 hour of the event"})
+		return
+	}
+
+	// Update the group fields
+	group.Name = request.Name
+	group.DateTime = request.DateTime
+	group.Location = request.Location
+	group.Cost = request.Cost
+	group.SkillLevel = request.SkillLevel
+	group.ActivityType = request.ActivityType
+	group.MaxMembers = request.MaxMembers
+	group.Description = request.Description
+
+	if err := db.Save(&group).Error; err != nil {
+		log.Printf("Error: Failed to update group: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update group"})
+		return
+	}
+
+	// Log the activity
+	if err := LogActivity(requester, "update_group", groupID); err != nil {
+		log.Printf("Warning: Failed to log activity: %v", err)
+	}
+
+	c.JSON(http.StatusOK, group)
+}
+
+// DeleteGroup handles deleting a group (organizer only)
+func DeleteGroup(c *gin.Context) {
+	groupID := c.Param("group_id")
+	requester := c.GetString("username")
+
+	db := database.GetDB()
+
+	// Check if group exists
+	var group models.Group
+	if err := db.Where("id = ?", groupID).First(&group).Error; err != nil {
+		log.Printf("Error: Group not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		return
+	}
+
+	// Check if requester is the organizer
+	if group.OrganiserID != requester {
+		log.Printf("Error: Only the organizer can delete the group")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can delete the group"})
+		return
+	}
+
+	// Prevent deletion if event is happening soon (within 1 hour)
+	if time.Until(group.DateTime) < time.Hour {
+		log.Printf("Error: Attempted to delete group too close to event time")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete group within 1 hour of the event"})
+		return
+	}
+
+	// Start a transaction to delete group and related data
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete all group members
+	if err := tx.Where("group_id = ?", groupID).Delete(&models.GroupMember{}).Error; err != nil {
+		tx.Rollback()
+		log.Printf("Error: Failed to delete group members: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete group members"})
+		return
+	}
+
+	// Delete group notifications
+	if err := tx.Where("group_id = ?", groupID).Delete(&models.Notification{}).Error; err != nil {
+		tx.Rollback()
+		log.Printf("Error: Failed to delete notifications: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete notifications"})
+		return
+	}
+
+	// Delete activity logs
+	if err := tx.Where("group_id = ?", groupID).Delete(&models.ActivityLog{}).Error; err != nil {
+		tx.Rollback()
+		log.Printf("Error: Failed to delete activity logs: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete activity logs"})
+		return
+	}
+
+	// Finally delete the group
+	if err := tx.Delete(&group).Error; err != nil {
+		tx.Rollback()
+		log.Printf("Error: Failed to delete group: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete group"})
+		return
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		log.Printf("Error: Failed to commit transaction: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete group"})
+		return
+	}
+
+	// Log the activity (using the main db since tx is committed)
+	if err := LogActivity(requester, "delete_group", groupID); err != nil {
+		log.Printf("Warning: Failed to log activity: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Group deleted successfully"})
+}
+
 // GetGroups handles listing all groups with filtering, sorting, and pagination.
 // Don't know what's going on here with sort parameter validation and numeric type conversion, but it's SQL injection safe.
 func GetGroups(c *gin.Context) {
@@ -229,6 +380,13 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
+	// Prevent joining if event is happening soon (within 1 hour)
+	if time.Until(group.DateTime) < time.Hour {
+		log.Printf("Error: Attempted to join group too close to event time")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot join group within 1 hour of the event"})
+		return
+	}
+
 	// Check if user is already a member
 	var member models.GroupMember
 	if err := db.Where("group_id = ? AND username = ?", groupID, username).First(&member).Error; err == nil {
@@ -333,6 +491,13 @@ func LeaveGroup(c *gin.Context) {
 	if group.OrganiserID == username {
 		log.Printf("Error: Organizer cannot leave their own group")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Organizer cannot leave their own group"})
+		return
+	}
+
+	// Prevent leaving if event is happening soon (within 1 hour)
+	if time.Until(group.DateTime) < time.Hour {
+		log.Printf("Error: Attempted to leave group too close to event time")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot leave group within 1 hour of the event"})
 		return
 	}
 
