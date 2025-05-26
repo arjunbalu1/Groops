@@ -549,10 +549,22 @@ func GetGroupByID(c *gin.Context) {
 		return
 	}
 
-	// Prepare response
+	// Create frontend-friendly response
 	response := gin.H{
-		"group": group,
-		"organiser": gin.H{
+		"id":                 group.ID,
+		"name":               group.Name,
+		"date_time":          group.DateTime,
+		"location":           group.Location,
+		"cost":               group.Cost,
+		"skill_level":        group.SkillLevel,
+		"activity_type":      group.ActivityType,
+		"max_members":        group.MaxMembers,
+		"description":        group.Description,
+		"organizer_username": group.OrganiserID,
+		"members":            group.Members,
+		"created_at":         group.CreatedAt,
+		"updated_at":         group.UpdatedAt,
+		"organizer": gin.H{
 			"username":   organiser.Username,
 			"rating":     organiser.Rating,
 			"avatar_url": organiser.AvatarURL,
