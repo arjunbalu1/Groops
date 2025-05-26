@@ -83,9 +83,17 @@ func GetMyProfile(c *gin.Context) {
 	})
 }
 
-// GetAccount retrieves account information
+// GetAccount retrieves account information (only allows access to own account)
 func GetAccount(c *gin.Context) {
 	username := c.Param("username")
+	requestingUser := c.GetString("username") // Get the authenticated user
+
+	// Authorization check: only allow users to access their own account
+	if username != requestingUser {
+		log.Printf("Error: User %s attempted to access account %s", requestingUser, username)
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied - can only access your own account"})
+		return
+	}
 
 	db := database.GetDB()
 	var account models.Account
