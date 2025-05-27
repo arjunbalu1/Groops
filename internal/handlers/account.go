@@ -367,13 +367,13 @@ func ListNotifications(c *gin.Context) {
 	if c.Query("unread") == "true" {
 		query = query.Where("read = ?", false)
 	}
-	limit := 10
+	// No limit by default - return all notifications
 	if l := c.Query("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 100 {
-			limit = n
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			query = query.Limit(n)
 		}
 	}
-	query = query.Limit(limit)
+	// If no limit specified, return all notifications
 
 	if err := query.Find(&notifications).Error; err != nil {
 		log.Printf("Error: Failed to fetch notifications: %v", err)
