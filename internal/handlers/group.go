@@ -253,6 +253,15 @@ func GetGroups(c *gin.Context) {
 
 	query := db.Preload("Members")
 
+	// Search functionality - searches across name, description, activity_type, and organiser_id
+	if searchTerm := c.Query("search"); searchTerm != "" {
+		searchPattern := "%" + searchTerm + "%"
+		query = query.Where(
+			"LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?) OR LOWER(activity_type) LIKE LOWER(?) OR LOWER(organiser_id) LIKE LOWER(?)",
+			searchPattern, searchPattern, searchPattern, searchPattern,
+		)
+	}
+
 	// Filtering
 	if activityType := c.Query("activity_type"); activityType != "" {
 		query = query.Where("activity_type = ?", activityType)
