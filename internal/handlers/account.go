@@ -367,13 +367,25 @@ func ListNotifications(c *gin.Context) {
 	if c.Query("unread") == "true" {
 		query = query.Where("read = ?", false)
 	}
-	// No limit by default - return all notifications
-	if l := c.Query("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 {
-			query = query.Limit(n)
-		}
+
+	// Handle pagination with offset and limit (like groups endpoint)
+	limitStr := c.DefaultQuery("limit", "10")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 10
 	}
-	// If no limit specified, return all notifications
+	if limit > 100 {
+		limit = 100 // max limit
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	query = query.Limit(limit).Offset(offset)
 
 	if err := query.Find(&notifications).Error; err != nil {
 		log.Printf("Error: Failed to fetch notifications: %v", err)
