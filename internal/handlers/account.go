@@ -393,17 +393,11 @@ func ListNotifications(c *gin.Context) {
 		return
 	}
 
-	// Mark unread notifications as read if any are returned
-	if len(notifications) > 0 {
-		var ids []uint
-		for _, n := range notifications {
-			if !n.Read {
-				ids = append(ids, n.ID)
-			}
-		}
-		if len(ids) > 0 {
-			db.Model(&models.Notification{}).Where("id IN ?", ids).Update("read", true)
-		}
+	// Mark ALL unread notifications as read when user opens notifications (not just the ones returned)
+	// This ensures the unread count goes to 0 when user checks their notifications
+	if err := db.Model(&models.Notification{}).Where("recipient_username = ? AND read = ?", username, false).Update("read", true).Error; err != nil {
+		log.Printf("Warning: Failed to mark notifications as read: %v", err)
+		// Non-fatal error - continue with response
 	}
 
 	c.JSON(http.StatusOK, notifications)
