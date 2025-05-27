@@ -130,6 +130,13 @@ func UpdateGroup(c *gin.Context) {
 		return
 	}
 
+	// Prevent updates if event has already passed
+	if time.Now().After(group.DateTime) {
+		log.Printf("Error: Attempted to update group after event has ended")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot update group after the event has ended"})
+		return
+	}
+
 	// Prevent updates if event is happening soon (within 1 hour)
 	if time.Until(group.DateTime) < time.Hour {
 		log.Printf("Error: Attempted to update group too close to event time")
@@ -180,6 +187,13 @@ func DeleteGroup(c *gin.Context) {
 	if group.OrganiserID != requester {
 		log.Printf("Error: Only the organizer can delete the group")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can delete the group"})
+		return
+	}
+
+	// Prevent deletion if event has already passed
+	if time.Now().After(group.DateTime) {
+		log.Printf("Error: Attempted to delete group after event has ended")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete group after the event has ended"})
 		return
 	}
 
@@ -389,6 +403,13 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
+	// Prevent joining if event has already passed
+	if time.Now().After(group.DateTime) {
+		log.Printf("Error: Attempted to join group after event has ended")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot join group after the event has ended"})
+		return
+	}
+
 	// Prevent joining if event is happening soon (within 1 hour)
 	if time.Until(group.DateTime) < time.Hour {
 		log.Printf("Error: Attempted to join group too close to event time")
@@ -500,6 +521,13 @@ func LeaveGroup(c *gin.Context) {
 	if group.OrganiserID == username {
 		log.Printf("Error: Organizer cannot leave their own group")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Organizer cannot leave their own group"})
+		return
+	}
+
+	// Prevent leaving if event has already passed
+	if time.Now().After(group.DateTime) {
+		log.Printf("Error: Attempted to leave group after event has ended")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot leave group after the event has ended"})
 		return
 	}
 
@@ -769,6 +797,13 @@ func RemoveMember(c *gin.Context) {
 	if group.OrganiserID != organizerUsername {
 		log.Printf("Error: User %s attempted to remove member from group %s but is not the organizer", organizerUsername, groupID)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only the organizer can remove members"})
+		return
+	}
+
+	// Prevent removal if event has already passed
+	if time.Now().After(group.DateTime) {
+		log.Printf("Error: Attempted to remove member after event has ended")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot remove members after the event has ended"})
 		return
 	}
 
