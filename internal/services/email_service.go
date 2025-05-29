@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"groops/internal/models"
 	"os"
+	"time"
 
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -27,6 +28,16 @@ func NewEmailService() *EmailService {
 		fromEmail: fromEmail,
 		fromName:  fromName,
 	}
+}
+
+// convertToIST converts UTC time to IST (Indian Standard Time)
+func convertToIST(utcTime time.Time) time.Time {
+	ist, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		// Fallback: manually add 5 hours 30 minutes
+		return utcTime.Add(5*time.Hour + 30*time.Minute)
+	}
+	return utcTime.In(ist)
 }
 
 // SendWelcomeEmail sends a welcome email to users who register a username
@@ -103,6 +114,10 @@ func (s *EmailService) SendMemberRemovalEmail(userEmail, userName, groupName str
 func (s *EmailService) SendEventReminderToGroup(group models.Group, members []models.Account, reminderType string) error {
 	from := mail.NewEmail(s.fromName, s.fromEmail)
 
+	// Convert UTC time to IST for display
+	istTime := convertToIST(group.DateTime)
+	timeStr := istTime.Format("Mon Jan 2, 3:04 PM") + " IST"
+
 	// Simple subject based on reminder type
 	subject := ""
 	if reminderType == "24hour" {
@@ -115,12 +130,12 @@ func (s *EmailService) SendEventReminderToGroup(group models.Group, members []mo
 	for _, member := range members {
 		to := mail.NewEmail(member.Username, member.Email)
 
-		// Use direct string formatting instead of template variables
+		// Use direct string formatting with IST time
 		plainContent := fmt.Sprintf("Hello %s, Your event %s is coming up soon at %s at %s. Don't miss it!",
-			member.Username, group.Name, group.DateTime.Format("Mon Jan 2, 3:04 PM"), group.Location.Name)
+			member.Username, group.Name, timeStr, group.Location.Name)
 
 		htmlContent := fmt.Sprintf("<p>Hello %s,</p><p>Your event <strong>%s</strong> is coming up soon at %s at %s.</p><p>Don't miss it!</p>",
-			member.Username, group.Name, group.DateTime.Format("Mon Jan 2, 3:04 PM"), group.Location.Name)
+			member.Username, group.Name, timeStr, group.Location.Name)
 
 		// Create a simple email without template variables
 		message := mail.NewSingleEmail(from, subject, to, plainContent, htmlContent)
