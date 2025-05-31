@@ -93,6 +93,6 @@ type CreateGroupRequest struct {
 	Cost         float64   `json:"cost"`
 	SkillLevel   *string   `json:"skill_level,omitempty"`
 	ActivityType string    `json:"activity_type" binding:"required"`
-	MaxMembers   int       `json:"max_members" binding:"required,min=2"`
+	MaxMembers   int       `json:"max_members" binding:"required,min=2,max=50"`
 	Description  string    `json:"description" binding:"required,max=1000"`
 }
