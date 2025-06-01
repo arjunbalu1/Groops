@@ -267,6 +267,38 @@ func GetGroups(c *gin.Context) {
 
 	query := db.Preload("Members")
 
+	// Location-based distance sorting and filtering
+	var userLat, userLng string
+	var hasUserLocation bool
+	if userLat = c.Query("user_lat"); userLat != "" {
+		if userLng = c.Query("user_lng"); userLng != "" {
+			hasUserLocation = true
+			// Add distance calculation using PostgreSQL's earth distance formula
+			// This calculates distance in kilometers using the haversine formula
+			query = query.Select(`"group".*, 
+				ROUND(
+					6371 * acos(
+						cos(radians(?)) * 
+						cos(radians(CAST(location->>'latitude' AS FLOAT))) * 
+						cos(radians(CAST(location->>'longitude' AS FLOAT)) - radians(?)) + 
+						sin(radians(?)) * 
+						sin(radians(CAST(location->>'latitude' AS FLOAT)))
+					)::numeric, 2
+				) AS distance_km`, userLat, userLng, userLat)
+
+			// Filter to only show groups within 50km radius using a subquery
+			query = query.Where(`(
+				6371 * acos(
+					cos(radians(?)) * 
+					cos(radians(CAST(location->>'latitude' AS FLOAT))) * 
+					cos(radians(CAST(location->>'longitude' AS FLOAT)) - radians(?)) + 
+					sin(radians(?)) * 
+					sin(radians(CAST(location->>'latitude' AS FLOAT)))
+				)
+			) <= 50`, userLat, userLng, userLat)
+		}
+	}
+
 	// Search functionality - searches across name, description, activity_type, and organiser_id
 	if searchTerm := c.Query("search"); searchTerm != "" {
 		searchPattern := "%" + searchTerm + "%"
@@ -317,18 +349,43 @@ func GetGroups(c *gin.Context) {
 		"date_time": true, "name": true, "cost": true,
 		"skill_level": true, "activity_type": true, "max_members": true,
 		"created_at": true, "updated_at": true,
+		"distance": true, // Add distance as valid sort option
 	}
 	if !validSortColumns[sortBy] {
 		sortBy = "date_time" // Default to safe value if invalid
 	}
 
-	// Validate sort order
-	sortOrder := c.DefaultQuery("sort_order", "asc")
-	if sortOrder != "asc" && sortOrder != "desc" {
-		sortOrder = "asc" // Default to ascending if invalid
+	// Special handling for distance sorting
+	if sortBy == "distance" && hasUserLocation {
+		// Use the calculated distance_km field for sorting
+		sortOrder := c.DefaultQuery("sort_order", "asc")
+		if sortOrder != "asc" && sortOrder != "desc" {
+			sortOrder = "asc"
+		}
+		query = query.Order(fmt.Sprintf("distance_km %s", sortOrder))
+	} else if sortBy == "distance" {
+		// If distance sort requested but no user location provided, fallback to date_time
+		log.Printf("Warning: Distance sort requested but no user location provided")
+		sortBy = "date_time"
+		query = query.Order("date_time asc")
+	} else {
+		// If user location is provided but not sorting by distance, still sort by distance first
+		if hasUserLocation {
+			sortOrder := c.DefaultQuery("sort_order", "asc")
+			if sortOrder != "asc" && sortOrder != "desc" {
+				sortOrder = "asc"
+			}
+			// Always sort by distance first when user location is available, then by requested sort
+			query = query.Order(fmt.Sprintf("distance_km asc, %s %s", sortBy, sortOrder))
+		} else {
+			// Validate sort order
+			sortOrder := c.DefaultQuery("sort_order", "asc")
+			if sortOrder != "asc" && sortOrder != "desc" {
+				sortOrder = "asc" // Default to ascending if invalid
+			}
+			query = query.Order(fmt.Sprintf("%s %s", sortBy, sortOrder))
+		}
 	}
-
-	query = query.Order(fmt.Sprintf("%s %s", sortBy, sortOrder))
 
 	// Pagination with defaults
 	limitStr := c.DefaultQuery("limit", "10")
