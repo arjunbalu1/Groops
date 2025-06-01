@@ -2,7 +2,7 @@
 
 **Backend API for activity-based group creation and participation**
 
-**Live API:** `https://groops.fun`
+**Live API:** `https://api.groops.fun`
 
 This is the **backend-only** Go API that powers the Groops platform. For the frontend React application, see the separate `groops-react` directory.
 
