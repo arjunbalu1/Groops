@@ -490,3 +490,77 @@ func GetProfileImage(c *gin.Context) {
 		log.Printf("Error copying image data: %v", err)
 	}
 }
+
+// UploadAvatar handles avatar image uploads
+func UploadAvatar(c *gin.Context) {
+	username := c.GetString("username")
+
+	// Check if username exists in the session
+	if username == "" {
+		log.Printf("Error: No authenticated user found")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	// Get the account
+	db := database.GetDB()
+	var account models.Account
+	if err := db.Where("username = ?", username).First(&account).Error; err != nil {
+		log.Printf("Error: Account not found: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Account not found"})
+		return
+	}
+
+	// Parse multipart form (max 10MB)
+	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+		log.Printf("Error: Failed to parse multipart form: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file upload"})
+		return
+	}
+
+	// Get the file from form
+	file, header, err := c.Request.FormFile("avatar")
+	if err != nil {
+		log.Printf("Error: Failed to get file: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
+		return
+	}
+	defer file.Close()
+
+	// Initialize image service
+	imageService, err := services.NewImageService()
+	if err != nil {
+		log.Printf("Error: Failed to initialize image service: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Image service unavailable"})
+		return
+	}
+
+	// Validate file (max 5MB)
+	maxSize := int64(5 << 20) // 5MB
+	if err := imageService.ValidateImageFile(file, maxSize); err != nil {
+		log.Printf("Error: File validation failed: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Upload to Cloudinary
+	avatarURL, err := imageService.UploadAvatar(file, header.Filename, account.Username)
+	if err != nil {
+		log.Printf("Error: Failed to upload avatar: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
+		return
+	}
+
+	// Update account with new avatar URL
+	if err := db.Model(&account).Update("avatar_url", avatarURL).Error; err != nil {
+		log.Printf("Error: Failed to update account avatar: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save avatar"})
+		return
+	}
+
+	log.Printf("Avatar uploaded successfully for user %s: %s", username, avatarURL)
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Avatar uploaded successfully",
+		"avatar_url": avatarURL,
+	})
+}

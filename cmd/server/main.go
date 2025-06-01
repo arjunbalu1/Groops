@@ -129,6 +129,7 @@ func main() {
 		authPageGroup.GET("/create-profile", handlers.CreateProfilePageHandler)
 		authPageGroup.GET("/dashboard", handlers.DashboardHandler)
 		authPageGroup.POST("/api/profile/register", handlers.CreateProfile)
+		authPageGroup.POST("/api/upload-avatar", handlers.UploadAvatar)
 
 		// Get current user profile - works for both complete and incomplete profiles
 		authPageGroup.GET("/api/auth/me", handlers.GetMyProfile)
