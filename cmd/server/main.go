@@ -103,6 +103,7 @@ func main() {
 	// Public routes
 	router.GET("/", handlers.HomeHandler)
 	router.GET("/health", handlers.HealthHandler)
+	router.GET("/adminmessage", handlers.AdminMessageHandler)
 
 	// Public group routes
 	router.GET("/groups", handlers.GetGroups)

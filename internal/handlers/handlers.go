@@ -97,3 +97,12 @@ func GetStats(c *gin.Context) {
 		"groups": groupCount,
 	})
 }
+
+// AdminMessageHandler returns a hardcoded admin message
+func AdminMessageHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Welcome to Groops! The platform is running smoothly. Feedback is highly appreciated.",
+		"status":    "active",
+		"timestamp": "2025-06-03T10:00:00Z",
+	})
+}
