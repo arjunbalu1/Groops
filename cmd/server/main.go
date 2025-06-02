@@ -157,6 +157,10 @@ func main() {
 		api.POST("/groups/:group_id/members/:username/reject", handlers.RejectJoinRequest)
 		api.POST("/groups/:group_id/members/:username/remove", handlers.RemoveMember)
 
+		// Message routes
+		api.GET("/groups/:group_id/messages", handlers.GetGroupMessages)
+		api.POST("/groups/:group_id/messages", handlers.SendGroupMessage)
+
 		// Notification routes
 		api.GET("/notifications", handlers.ListNotifications)
 		api.GET("/notifications/unread-count", handlers.GetUnreadNotificationCount)

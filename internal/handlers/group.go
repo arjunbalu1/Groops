@@ -721,6 +721,22 @@ func ApproveJoinRequest(c *gin.Context) {
 		log.Printf("Warning: Failed to create approval notification: %v", err)
 	}
 
+	// Notify all existing approved group members (except organizer) about the new member
+	var existingMembers []models.GroupMember
+	if err := db.Where("group_id = ? AND status = ? AND username != ?", groupID, "approved", username).Find(&existingMembers).Error; err != nil {
+		log.Printf("Warning: Failed to fetch existing members for new member notifications: %v", err)
+	} else {
+		memberJoinMsg := username + " has joined your group '" + group.Name + "'"
+		for _, existingMember := range existingMembers {
+			// Don't notify the organizer (they initiated the approval)
+			if existingMember.Username != group.OrganiserID {
+				if err := createNotification(db, existingMember.Username, "member_joined", memberJoinMsg, groupID); err != nil {
+					log.Printf("Warning: Failed to create member join notification for %s: %v", existingMember.Username, err)
+				}
+			}
+		}
+	}
+
 	// Send email notification to the approved user
 	emailService := services.NewEmailService()
 	var userAccount models.Account
