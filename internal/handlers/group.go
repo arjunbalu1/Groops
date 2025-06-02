@@ -91,6 +91,12 @@ func CreateGroup(c *gin.Context) {
 		log.Printf("Warning: Failed to log activity: %v", err)
 	}
 
+	// Notify the creator about successful group creation
+	msg := fmt.Sprintf("Your groop '%s' has been created successfully! People can now discover and join your activity.", group.Name)
+	if err := createNotification(db, organizerUsername, "group_created", msg, group.ID); err != nil {
+		log.Printf("Warning: Failed to create creator notification: %v", err)
+	}
+
 	c.JSON(http.StatusCreated, group)
 }
 
