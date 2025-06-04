@@ -273,12 +273,16 @@ func GetGroups(c *gin.Context) {
 
 	query := db.Preload("Members")
 
-	// Location-based distance sorting and filtering
+	// Only show future groups (consistent with search behavior)
+	query = query.Where("date_time > NOW()")
+
+	// Location-based filtering and distance calculation
 	var userLat, userLng string
 	var hasUserLocation bool
 	if userLat = c.Query("user_lat"); userLat != "" {
 		if userLng = c.Query("user_lng"); userLng != "" {
 			hasUserLocation = true
+
 			// Add distance calculation using PostgreSQL's earth distance formula
 			// This calculates distance in kilometers using the haversine formula
 			query = query.Select(`"group".*, 
@@ -292,26 +296,79 @@ func GetGroups(c *gin.Context) {
 					)::numeric, 2
 				) AS distance_km`, userLat, userLng, userLat)
 
-			// Filter to only show groups within 50km radius using a subquery
-			query = query.Where(`(
-				6371 * acos(
-					cos(radians(?)) * 
-					cos(radians(CAST(location->>'latitude' AS FLOAT))) * 
-					cos(radians(CAST(location->>'longitude' AS FLOAT)) - radians(?)) + 
-					sin(radians(?)) * 
-					sin(radians(CAST(location->>'latitude' AS FLOAT)))
-				)
-			) <= 50`, userLat, userLng, userLat)
+			// Apply radius filter only if radius parameter is provided
+			if radiusStr := c.Query("radius"); radiusStr != "" {
+				radius, err := strconv.ParseFloat(radiusStr, 64)
+				if err != nil || radius <= 0 {
+					log.Printf("Warning: Invalid radius parameter '%s', ignoring radius filter", radiusStr)
+				} else {
+					// Filter to only show groups within specified radius using a subquery
+					query = query.Where(`(
+						6371 * acos(
+							cos(radians(?)) * 
+							cos(radians(CAST(location->>'latitude' AS FLOAT))) * 
+							cos(radians(CAST(location->>'longitude' AS FLOAT)) - radians(?)) + 
+							sin(radians(?)) * 
+							sin(radians(CAST(location->>'latitude' AS FLOAT)))
+						)
+					) <= ?`, userLat, userLng, userLat, radius)
+				}
+			}
 		}
 	}
 
-	// Search functionality - searches across name, description, activity_type, and organiser_id
+	// Search functionality - advanced full-text search with ranking and fuzzy matching
+	// If search is present, we'll get initial results and then apply filters to them
+	var searchResultIDs []string
 	if searchTerm := c.Query("search"); searchTerm != "" {
-		searchPattern := "%" + searchTerm + "%"
-		query = query.Where(
-			"LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?) OR LOWER(activity_type) LIKE LOWER(?) OR LOWER(organiser_id) LIKE LOWER(?)",
-			searchPattern, searchPattern, searchPattern, searchPattern,
-		)
+		// Use advanced search service to get relevant group IDs
+		searchService := services.NewSearchService()
+
+		// Get pagination parameters for search (we'll apply these later)
+		limitStr := c.DefaultQuery("limit", "10")
+		offsetStr := c.DefaultQuery("offset", "0")
+
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 {
+			limit = 10
+		}
+		if limit > 100 {
+			limit = 100
+		}
+
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil || offset < 0 {
+			offset = 0
+		}
+
+		// Get more results from search to account for filtering
+		// We'll get 10x the limit to ensure we have enough after filtering
+		searchLimit := limit * 10
+		if searchLimit > 1000 {
+			searchLimit = 1000 // Cap at reasonable limit
+		}
+
+		// Perform advanced search
+		searchResults, err := searchService.SearchGroups(searchTerm, searchLimit, 0)
+		if err != nil {
+			log.Printf("Error: Advanced search failed: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed"})
+			return
+		}
+
+		// Extract group IDs from search results to filter the main query
+		for _, group := range searchResults {
+			searchResultIDs = append(searchResultIDs, group.ID)
+		}
+
+		// If no search results, return empty
+		if len(searchResultIDs) == 0 {
+			c.JSON(http.StatusOK, []models.Group{})
+			return
+		}
+
+		// Filter main query to only include search results
+		query = query.Where("\"group\".id IN ?", searchResultIDs)
 	}
 
 	// Filtering
@@ -375,8 +432,16 @@ func GetGroups(c *gin.Context) {
 		sortBy = "date_time"
 		query = query.Order("date_time asc")
 	} else {
-		// If user location is provided but not sorting by distance, still sort by distance first
-		if hasUserLocation {
+		// Special case: If we have search results, preserve search ranking unless explicitly sorted
+		if len(searchResultIDs) > 0 && sortBy == "date_time" && c.Query("sort_by") == "" {
+			// Preserve search ranking by ordering by the position in searchResultIDs
+			orderClause := "CASE \"group\".id"
+			for i, id := range searchResultIDs {
+				orderClause += fmt.Sprintf(" WHEN '%s' THEN %d", id, i)
+			}
+			orderClause += " END"
+			query = query.Order(orderClause)
+		} else if hasUserLocation {
 			sortOrder := c.DefaultQuery("sort_order", "asc")
 			if sortOrder != "asc" && sortOrder != "desc" {
 				sortOrder = "asc"
