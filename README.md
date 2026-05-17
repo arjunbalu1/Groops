@@ -1,4 +1,4 @@
-# (repo is ai slop kinda)
+# (repo is ai slop kinda, pls dont peak)
 # Groops Backend API 🌍
 
 **Backend API for activity-based group creation and participation**
